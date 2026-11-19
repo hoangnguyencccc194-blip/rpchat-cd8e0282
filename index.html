@@ -330,7 +330,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=fc250c01b1';
+window.SEED_URL='seed.json?v=f76fa85f10';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -592,12 +592,14 @@ Group rules:
  return X(p.join('\n\n'))}
 function sumCut(chat,msgs){if(!chat?.summary?.trim()||!chat.sumUpTo)return msgs;const i=msgs.findIndex(m=>m.id===chat.sumUpTo);return i>=0?msgs.slice(i+1):msgs}
 function dataUrlPart(u){const m=/^data:([^;]+);base64,(.*)$/s.exec(u);return m?{inlineData:{mimeType:m[1],data:m[2]}}:null}
-function rawContents(char,msgs,imgLimit=S.imgLimit,ctx={}){let left=imgLimit;const raw=[];const chat=ctx.chat;const grp=isGroup(chat);
+const IMG_TURNS=2;/* only the newest 2 user turns carry image data; older images become a short note so every request stays small */
+function rawContents(char,msgs,imgLimit=S.imgLimit,ctx={}){let left=imgLimit,uTurn=0;const raw=[];const chat=ctx.chat;const grp=isGroup(chat);
  for(let i=msgs.length-1;i>=0;i--){const m=msgs[i];const parts=[];if(m.hidden)continue;
   if(m.greeting&&msgText(m).trim()===PLACE)continue;
   if(m.narrator){const nt=msgText(m).trim();if(nt)raw.unshift({role:'user',parts:[{text:'[Opening scene] '+macros(nt,{char,chat,dry:true,members:ctx.members})}]});continue}
-  if(m.images?.length){if(!ctx._imgSeen){ctx._imgSeen=1;left=Math.max(left,Math.min(m.images.length,4))}const take=[];for(let k=m.images.length-1;k>=0&&left>0;k--,left--)take.unshift(m.images[k]);take.forEach(u=>{const p=dataUrlPart(u);p&&parts.push(p)});
-   if(take.length<m.images.length)parts.push({text:`[${m.images.length-take.length} ảnh cũ đã lược bỏ]`})}
+  if(m.role==='user')uTurn++;
+  if(m.images?.length){const fresh=m.role==='user'?uTurn<=IMG_TURNS:false;if(fresh&&!ctx._imgSeen){ctx._imgSeen=1;left=Math.max(left,Math.min(m.images.length,4))}const take=[];if(fresh)for(let k=m.images.length-1;k>=0&&left>0;k--,left--)take.unshift(m.images[k]);take.forEach(u=>{const p=dataUrlPart(u);p&&parts.push(p)});
+   if(take.length<m.images.length)parts.push({text:`[${m.images.length-take.length===1?'ảnh':(m.images.length-take.length)+' ảnh'} đã gửi trước đó]`})}
   const who=m.role==='user'?'user':'ai';const sp=m.role==='user'?null:msgChar(m,chat,char);
   let t=applyRegex(macros(msgText(m),{char:sp||char,chat,dry:true,members:ctx.members}),who,'prompt');
   if(grp&&t&&sp&&sp.id!==char.id)t=sp.name+': '+t;if(t)parts.push({text:t});if(!parts.length)continue;raw.unshift({role:m.role==='user'?'user':'model',parts})}
@@ -679,11 +681,12 @@ function showMemory(){const{char:c,chat:ch}=cur;modal(`<h3>{i:brain} Bộ nhớ 
  m.querySelector('#mm-clr').onclick=async()=>{ch.summary='';ch.sumUpTo=null;m.querySelector('#mm-sum').value='';await saveChat(ch);info()};
  m.querySelector('#mm-now').onclick=async e=>{if(busy)return toast('Đang tạo câu trả lời, đợi xong đã.');ch.memory=m.querySelector('#mm-mem').value;ch.summary=m.querySelector('#mm-sum').value;e.target.disabled=true;await summarize(c,ch,true);e.target.disabled=false;m.querySelector('#mm-sum').value=ch.summary||'';info()}})}
 const STREAM=()=>S.stream!==false;
-const reqHasImg=req=>(req.body?.contents||[]).some(c=>(c.parts||[]).some(p=>p.inlineData));
+/* route direct only when the user's newest turn itself carries an image */
+const reqHasImg=req=>{const cs=req.body?.contents||[];for(let i=cs.length-1;i>=0;i--)if(cs[i].role==='user')return(cs[i].parts||[]).some(p=>p.inlineData);return false};
 function imgDirect(){if(S.imgDirect===false)return null;const pk=getProxyKey().trim(),gk=getKey().trim();const key=/^AIza[\w-]{20,}$/.test(pk)?pk:gk;if(!key)return null;const pm=(S.proxyModel||'').trim();return{key,model:/^gemini-/i.test(pm)?pm:S.model.trim()}}
 let imgNoted=0;
 async function aiStream(req,onText){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
- if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/404|not found|không hợp lệ|400/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
+ if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/(^|\D)404(\D|$)|not found/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
  if(STREAM())return fn(onText);const r=await fn(()=>{});if(r.text)onText(r.text);return r}
 
 /* ---------- GEMINI STREAM ---------- */
