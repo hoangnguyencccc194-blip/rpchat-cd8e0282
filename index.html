@@ -225,8 +225,8 @@ pre.pv{background:#26272a!important;border-color:#45464c!important}
 ::-webkit-scrollbar-thumb{background:#4f5056!important}
 .pitem.on{border-color:#9a9ba0!important;background:#3a3b40!important}
 .swatch{display:none}
-.m{content-visibility:auto;contain-intrinsic-size:auto 140px}
-.m.last,.m:has(textarea){content-visibility:visible}
+#c-scroll{overflow-anchor:none}
+#c-newmsg{position:sticky;bottom:12px;display:none;margin:0 auto;width:max-content;z-index:5;padding:8px 14px;border-radius:999px;background:#e6e6e6!important;color:#1f2023!important;border:0;font-size:13.5px;font-weight:600}
 #c-older{display:block;margin:0 auto 14px}
 .lite *,.lite *:before,.lite *:after{transition:none!important}
 input[type=range]{accent-color:#cfd0d4}
@@ -292,7 +292,7 @@ input[type=range]{accent-color:#cfd0d4}
 <!-- CHAT -->
 <section class="view" id="v-chat">
  <header><button class="icon" id="c-back">{i:back}</button><div class="av" id="c-av"></div><h1 id="c-title"></h1><button class="icon" id="c-more">{i:more}</button></header>
- <div class="scroll" id="c-scroll"><div id="msgs"></div></div>
+ <div class="scroll" id="c-scroll"><div id="msgs"></div><button id="c-newmsg" type="button">↓ Tin mới</button></div>
  <div class="composer">
   <div class="qbar" id="c-gbar"></div><div class="qbar" id="c-qbar"></div><div class="prev" id="c-prev"></div>
   <div class="in">
@@ -327,7 +327,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=1e8192f7dd';
+window.SEED_URL='seed.json?v=b6db13fc71';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -875,17 +875,29 @@ function showPrompt(){const{char:c,chat:ch}=cur;const sp=nextSpeakerPreview();co
  <div class="bar"><i style="width:${pct}%"></i></div><p class="hint">Ước tính ≈ 3,2 ký tự/token. Ngân sách = context tối đa (${st.max}) − token trả lời (${S.maxTokens}). Người trả lời kế tiếp: ${esc(sp.name)}. Stop: ${esc(r.stops.map(s=>JSON.stringify(s)).join(', ')||'—')}</p>
  <details class="sub"><summary>{i:code} Xem prompt thô</summary><pre class="pv">${esc(txt.length>20000?txt.slice(0,6000)+'\n\n… ('+(txt.length-12000)+' ký tự) …\n\n'+txt.slice(-6000):txt)}</pre></details>`)}
 function nearBottom(){const s=$('#c-scroll');return s.scrollHeight-s.scrollTop-s.clientHeight<120}
-function scrollDown(force){const s=$('#c-scroll');if(force||nearBottom())s.scrollTop=s.scrollHeight}
+/* bottom pinning: 'stick' only changes on real user scroll gestures, so content growth / re-renders can never leave the view stranded on old messages */
+let stick=true,unseen=false,userTs=0,touching=false;
+function pin(){const s=$('#c-scroll');s.scrollTop=s.scrollHeight}
+function updNew(){const b=$('#c-newmsg');if(!b)return;const show=!stick&&!nearBottom();if(!show)unseen=false;b.textContent=unseen?'↓ Tin mới':'↓ Xuống cuối';b.style.display=show?'block':'none'}
+function scrollDown(force){if(force)stick=true;if(stick){pin();requestAnimationFrame(()=>{if(stick)pin()})}else{unseen=true}updNew()}
+(()=>{const sc=$('#c-scroll'),mk=()=>userTs=performance.now();
+ for(const e of['touchmove','wheel','pointerdown','keydown'])sc.addEventListener(e,mk,{passive:true});
+ sc.addEventListener('touchstart',()=>{touching=true;mk()},{passive:true});
+ for(const e of['touchend','touchcancel'])sc.addEventListener(e,()=>{touching=false;mk()},{passive:true});
+ sc.addEventListener('scroll',()=>{if(touching||performance.now()-userTs<1200)stick=nearBottom();else if(nearBottom())stick=true;updNew()},{passive:true});
+ $('#c-newmsg').onclick=()=>{stick=true;unseen=false;pin();updNew()};
+ if(window.ResizeObserver)new ResizeObserver(()=>{if(stick)pin();else updNew()}).observe($('#msgs'));
+ const vv=()=>{if(stick){pin();requestAnimationFrame(()=>{if(stick)pin()})}};window.visualViewport?.addEventListener('resize',vv);addEventListener('resize',vv)})();
 const shown=(m,c,ch)=>applyRegex(fill(msgText(m),c,ch),m.role==='user'?'user':'ai','display');
 const MSG_WIN=40;
-function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');const n=ch.messages.length;const per=P(ch);const from=Math.max(0,n-(cur.win||MSG_WIN));
+function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');const n=ch.messages.length;const per=P(ch);let from=Math.max(0,n-(cur.win||MSG_WIN));if(!stick&&!force&&cur.from!=null)from=Math.min(from,cur.from,Math.max(0,n-1));cur.from=from;if(force)stick=true;
  const gg=gOf(ch);B.innerHTML=(from>0?`<button class="btn-g" id="c-older">{i:chevron-down} Xem ${from} tin cũ hơn</button>`:'')+ch.messages.slice(from).map((m,i0)=>{const i=i0+from;const u=m.role==='user';const c=u?c0:msgChar(m,ch,c0);const nar=!!m.narrator;
   const ck=m.ckpt?CT.find(x=>x.id===m.ckpt.id):null;
   return`<div class="m ${u?'u':''} ${i===n-1?'last':''}" data-i="${i}"><div class="av ${u&&per?.avatar?'pav':''}" style="${u?(per?.avatar?`--pav:url('${per.avatar}')`:''):`background-image:url('${nar?(gAv(gg)||c.avatar):c.avatar}')${nar?';border-radius:12px':''}`}"></div><div class="bub"><div class="who">${esc(u?per?.name||'User':nar?(gg?.name||'Mở đầu')+' · mở đầu':c.name)}</div>
   ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${render(shown(m,c,ch))}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
   ${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
   <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button><button data-a="cont" title="Tiếp tục">{i:forward}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(errText?`<div class="errbox">${esc(errText)}</div>`:'')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
- const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),h0=sc.scrollHeight,t0=sc.scrollTop;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);sc.scrollTop=t0+(sc.scrollHeight-h0)};
+ const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),f=B.querySelector('.m'),id=f?.dataset.i,y0=f?f.getBoundingClientRect().top:0;stick=false;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);const fix=()=>{const e=id!=null&&B.querySelector(`.m[data-i="${id}"]`);if(e)sc.scrollTop+=e.getBoundingClientRect().top-y0};fix();requestAnimationFrame(()=>{fix();setTimeout(fix,250)})};
  B.querySelectorAll('.bub img').forEach(im=>im.onclick=()=>{$('#imgview img').src=im.src;$('#imgview').style.display='flex'});
  B.querySelectorAll('[data-a]').forEach(b=>b.onclick=ev=>msgAction(+b.closest('.m').dataset.i,b.dataset.a,ev.currentTarget));
  B.querySelectorAll('[data-ck]').forEach(b=>b.onclick=()=>openChat(b.dataset.ck));
@@ -931,7 +943,7 @@ async function generate(mode,errNote,speakerId){const{char:c0,chat:ch}=cur;if(bu
  if(mode==='swipe'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return toast('Đây là lời mở đầu của nhóm – bấm Sửa để đổi');c=msgChar(target,ch,c0);history=ch.messages.slice(0,-1);target.swipes.push('');target.sw=target.swipes.length-1}
  else if(mode==='cont'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return;c=msgChar(target,ch,c0);history=ch.messages.slice();extra=S.contNudge||DEF_CONT}
  else{c=speakerId?CH.find(x=>x.id===speakerId):(isGroup(ch)?pickSpeaker(ch,msgText(ch.messages[ch.messages.length-1]||{swipes:['']})):c0);c=c||c0;history=ch.messages.slice();target={id:uid(),role:'model',charId:c.id,swipes:[''],sw:0,t:Date.now()};ch.messages.push(target)}
- const base=mode==='cont'?msgText(target):'';busy=true;target.streaming=true;target.note='';drawMsgs(true);let err='',hit=false;
+ const base=mode==='cont'?msgText(target):'';busy=true;target.streaming=true;target.note='';drawMsgs(false);let err='',hit=false;
  try{const req=buildRequest(c,ch,history,extra);let lastDraw=0,raf=0;
   const put=t=>{if(isGroup(ch)&&mode!=='cont')t=t.replace(new RegExp('^\\s*'+reEsc(c.name)+'\\s*:\\s*'),'');target.swipes[target.sw]=base+(mode==='cont'&&base&&t&&!/^\s/.test(t)?' ':'')+t};
   const r=await aiStream(req,t=>{const k=cutStop(t,req.stops);if(k!=null){t=k;if(!hit){hit=true;abortCtl?.abort()}}put(t);if(!raf&&performance.now()-lastDraw>100)raf=requestAnimationFrame(()=>{raf=0;lastDraw=performance.now();const el=document.querySelector('.m.last .tx');if(el){el.innerHTML=render(shown(target,c,ch));scrollDown()}})});if(raf){cancelAnimationFrame(raf);raf=0}
