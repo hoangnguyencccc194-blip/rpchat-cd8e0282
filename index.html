@@ -282,13 +282,13 @@ input[type=range]{accent-color:#cfd0d4}
 
 <!-- DETAIL -->
 <section class="view" id="v-detail">
- <header><button class="icon" onclick="go('home')">{i:back}</button><h1 id="d-title"></h1><button class="icon" id="d-more">{i:more}</button></header>
+ <header><button class="icon" onclick="NAV.appBack(()=>go('home'))">{i:back}</button><h1 id="d-title"></h1><button class="icon" id="d-more">{i:more}</button></header>
  <div class="scroll" id="d-scroll"></div>
 </section>
 
 <!-- EDIT CHAR -->
 <section class="view" id="v-edit">
- <header><button class="icon" onclick="history.length&&back()">{i:back}</button><h1 id="e-title">Nhân vật</h1><button class="btn-p" id="e-save">Lưu</button></header>
+ <header><button class="icon" onclick="NAV.appBack(()=>back())">{i:back}</button><h1 id="e-title">Nhân vật</h1><button class="btn-p" id="e-save">Lưu</button></header>
  <div class="scroll"><div class="pad" id="e-body"></div></div>
 </section>
 
@@ -309,17 +309,17 @@ input[type=range]{accent-color:#cfd0d4}
 
 <!-- LOREBOOK -->
 <section class="view" id="v-lore">
- <header><button class="icon" onclick="go('home','lore')">{i:back}</button><h1 id="l-title"></h1><button class="icon" id="l-more">{i:more}</button></header>
+ <header><button class="icon" onclick="NAV.appBack(()=>go('home','lore'))">{i:back}</button><h1 id="l-title"></h1><button class="icon" id="l-more">{i:more}</button></header>
  <div class="scroll"><div class="pad" id="l-body"></div></div>
 </section>
 
 <!-- SETTINGS -->
 <section class="view" id="v-settings">
- <header><button class="icon" onclick="go('home')">{i:back}</button><h1>Cài đặt</h1><button class="btn-p" id="s-save">Lưu</button></header>
+ <header><button class="icon" onclick="NAV.appBack(()=>go('home'))">{i:back}</button><h1>Cài đặt</h1><button class="btn-p" id="s-save">Lưu</button></header>
  <div class="scroll"><div class="pad" id="s-body"></div></div>
 </section>
 
-<div id="imgview" onclick="this.style.display='none'"><img></div>
+<div id="imgview"><img></div>
 <input type="file" id="gfile" hidden>
 
 <script>
@@ -330,7 +330,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=fb12567cb3';
+window.SEED_URL='seed.json?v=fc250c01b1';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -461,7 +461,7 @@ async function getPastedImage(title){const c=await clipboardImage();if(c)return 
 function pasteAvatar(el,apply){if(!el)return;el.tabIndex=0;el.addEventListener('paste',async e=>{const fs=clipFiles(e.clipboardData);const u=imgUrlIn(e.clipboardData?.getData('text/plain'));if(!fs.length&&!u)return;e.preventDefault();try{apply(fs.length?await readFile(fs[0],'url'):await srcFromUrl(u))}catch(er){toast(er.message)}})}
 function pick(accept,multiple=false){return new Promise(res=>{const f=$('#gfile');f.accept=accept;f.multiple=multiple;f.value='';f.onchange=()=>res([...f.files]);f.click()})}
 function download(name,data,type='application/json'){const b=data instanceof Blob?data:new Blob([typeof data==='string'?data:JSON.stringify(data,null,1)],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
-function modal(html,onmount){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="sheet">${html}</div>`;m.onclick=e=>{if(e.target===m)m.remove()};document.body.appendChild(m);onmount&&onmount(m);return m}
+function modal(html,onmount){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="sheet">${html}</div>`;m.onclick=e=>{if(e.target===m)m.remove()};document.body.appendChild(m);{const done=typeof NAV!=='undefined'?NAV.overlay(()=>{m._nn=1;Element.prototype.remove.call(m)}):null;m.remove=function(){Element.prototype.remove.call(this);if(!this._nn){this._nn=1;done&&done()}}}onmount&&onmount(m);return m}
 function menu(anchor,items){document.querySelectorAll('.menu').forEach(x=>x.remove());const m=document.createElement('div');m.className='menu';
  items.filter(Boolean).forEach(([t,f])=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>{m.remove();f()};m.appendChild(b)});document.body.appendChild(m);
  const r=anchor.getBoundingClientRect();const h=m.offsetHeight;let top=r.bottom+4;if(top+h>innerHeight-8)top=Math.max(8,r.top-h-4);m.style.top=top+'px';m.style.right=Math.max(8,innerWidth-r.right)+'px';
@@ -596,7 +596,7 @@ function rawContents(char,msgs,imgLimit=S.imgLimit,ctx={}){let left=imgLimit;con
  for(let i=msgs.length-1;i>=0;i--){const m=msgs[i];const parts=[];if(m.hidden)continue;
   if(m.greeting&&msgText(m).trim()===PLACE)continue;
   if(m.narrator){const nt=msgText(m).trim();if(nt)raw.unshift({role:'user',parts:[{text:'[Opening scene] '+macros(nt,{char,chat,dry:true,members:ctx.members})}]});continue}
-  if(m.images?.length){const take=[];for(let k=m.images.length-1;k>=0&&left>0;k--,left--)take.unshift(m.images[k]);take.forEach(u=>{const p=dataUrlPart(u);p&&parts.push(p)});
+  if(m.images?.length){if(!ctx._imgSeen){ctx._imgSeen=1;left=Math.max(left,Math.min(m.images.length,4))}const take=[];for(let k=m.images.length-1;k>=0&&left>0;k--,left--)take.unshift(m.images[k]);take.forEach(u=>{const p=dataUrlPart(u);p&&parts.push(p)});
    if(take.length<m.images.length)parts.push({text:`[${m.images.length-take.length} ảnh cũ đã lược bỏ]`})}
   const who=m.role==='user'?'user':'ai';const sp=m.role==='user'?null:msgChar(m,chat,char);
   let t=applyRegex(macros(msgText(m),{char:sp||char,chat,dry:true,members:ctx.members}),who,'prompt');
@@ -679,14 +679,18 @@ function showMemory(){const{char:c,chat:ch}=cur;modal(`<h3>{i:brain} Bộ nhớ 
  m.querySelector('#mm-clr').onclick=async()=>{ch.summary='';ch.sumUpTo=null;m.querySelector('#mm-sum').value='';await saveChat(ch);info()};
  m.querySelector('#mm-now').onclick=async e=>{if(busy)return toast('Đang tạo câu trả lời, đợi xong đã.');ch.memory=m.querySelector('#mm-mem').value;ch.summary=m.querySelector('#mm-sum').value;e.target.disabled=true;await summarize(c,ch,true);e.target.disabled=false;m.querySelector('#mm-sum').value=ch.summary||'';info()}})}
 const STREAM=()=>S.stream!==false;
-async function aiStream(req,onText){const fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
+const reqHasImg=req=>(req.body?.contents||[]).some(c=>(c.parts||[]).some(p=>p.inlineData));
+function imgDirect(){if(S.imgDirect===false)return null;const pk=getProxyKey().trim(),gk=getKey().trim();const key=/^AIza[\w-]{20,}$/.test(pk)?pk:gk;if(!key)return null;const pm=(S.proxyModel||'').trim();return{key,model:/^gemini-/i.test(pm)?pm:S.model.trim()}}
+let imgNoted=0;
+async function aiStream(req,onText){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
+ if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/404|not found|không hợp lệ|400/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
  if(STREAM())return fn(onText);const r=await fn(()=>{});if(r.text)onText(r.text);return r}
 
 /* ---------- GEMINI STREAM ---------- */
 let abortCtl=null;
 function explainErr(status,msg){const m={400:'400 – Yêu cầu không hợp lệ (sai model, tham số hoặc nội dung).',401:'401 – API key không hợp lệ.',403:'403 – API key không có quyền / bị chặn / chưa bật Gemini API.',404:'404 – Không tìm thấy model. Kiểm tra tên model trong Cài đặt.',429:'429 – Vượt giới hạn (quota/rate limit). Đợi một lúc hoặc đổi model.',500:'500 – Lỗi máy chủ Google. Thử lại.',503:'503 – Model quá tải. Thử lại sau.'};return(m[status]||('HTTP '+status))+(msg?'\n'+msg:'')}
-async function geminiStream(body,onText){const key=getKey();if(!key)throw new Error('Chưa có Gemini API key (đang dùng nguồn Gemini API). Vào {i:gear} Cài đặt để dán key, hoặc chuyển sang Proxy.');
- abortCtl=new AbortController();const ns=!STREAM();const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.model.trim())}:`+(ns?'generateContent':'streamGenerateContent?alt=sse');
+async function geminiStream(body,onText,ov){const key=ov?.key||getKey();if(!key)throw new Error('Chưa có Gemini API key (đang dùng nguồn Gemini API). Vào {i:gear} Cài đặt để dán key, hoặc chuyển sang Proxy.');
+ abortCtl=new AbortController();const ns=!STREAM();const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(ov?.model||S.model.trim())}:`+(ns?'generateContent':'streamGenerateContent?alt=sse');
  let res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal});
  const post=()=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal});
  const gc=body.generationConfig||{};const EXTRA=['topK','presencePenalty','frequencyPenalty','stopSequences'];
@@ -711,9 +715,50 @@ function finishNote(r){if(r.block)return`{i:ban} Prompt bị chặn bởi bộ l
  if(r.finish==='MAX_TOKENS')return'{i:info} Đã chạm giới hạn token đầu ra — bấm "Tiếp tục" để viết tiếp.';if(r.finish&&!['STOP','MAX_TOKENS'].includes(r.finish))return`{i:alert} Dừng do: ${r.finish}`;return''}
 /* ---------- ROUTER ---------- */
 let cur={char:null,chat:null},homeTab='chars',stack=[];
-function go(v,arg){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));stack.push(v);
+function go(v,arg){if(typeof NAV!=='undefined')NAV.onGo(v,arg);document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));stack.push(v);
  if(v==='home'){if(arg)homeTab=arg;renderHome()}if(v==='settings')renderSettings()}
 function back(){stack.pop();const p=stack.pop()||'home';p==='detail'&&cur.group?openGroup(cur.group.id):p==='detail'&&cur.char?openDetail(cur.char.id):go(p)}
+
+/* ---------- IN-APP HISTORY (Android back / edge-swipe returns to the previous screen instead of leaving the site) ---------- */
+var NAV={stack:[],ov:{},silent:0,q:[],qt:0,popping:false,editId:null,loreId:null,
+ st(){const s=history.state;return s&&s.rp?s:null},
+ n(){return this.st()?.n||0},
+ save(){try{sessionStorage.setItem('rp_nav',JSON.stringify(this.stack.slice(0,this.n()+1)))}catch(e){}},
+ same(a,b){return !!(a&&b&&!a.o&&!b.o&&a.v===b.v&&(a.id||'')===(b.id||''))},
+ snap(){const s=this.st();if(s&&s.v==='chat'&&document.getElementById('v-chat').classList.contains('on')){const sc=$('#c-scroll');const t={...s,scroll:sc.scrollTop,bottom:stick||nearBottom()};history.replaceState(t,'');this.stack[t.n]=t}},
+ push(e){this.snap();const n=this.n();e={...e,rp:1,n:n+1};this.stack.length=n+1;this.stack[n+1]=e;history.pushState(e,'');this.save()},
+ replace(e){const n=this.n();e={...e,rp:1,n};this.stack[n]=e;history.replaceState(e,'');this.save()},
+ back(k=1){if(k<1)return;this.silent++;history.go(-k);clearTimeout(this.qt);this.qt=setTimeout(()=>{if(this.silent){this.silent=0;this.flush()}},900)},
+ run(f){if(this.silent>0)this.q.push(f);else f()},
+ flush(){const q=this.q;this.q=[];for(const f of q)f()},
+ desc(v,arg){const e={v};if(v==='home')e.tab=arg||homeTab;if(v==='chat')e.id=cur.chat?.id;if(v==='detail')e.id=cur.group?'g:'+cur.group.id:cur.char?.id;if(v==='edit')e.id=this.editId;if(v==='lore')e.id=this.loreId;return e},
+ onGo(v,arg){if(this.popping)return;const e=this.desc(v,arg);this.run(()=>this.apply(e))},
+ apply(e){const v=e.v,n=this.n(),ce=this.stack[n]||this.st();
+  if(v==='home'){this.closeAbove(n);if(n>0)this.back(n);else this.replace(e);return}
+  if(this.same(ce,e)){this.replace(e);return}
+  if(n>0&&this.same(this.stack[n-1],e)){this.back(1);return}
+  this.push(e)},
+ appBack(fb){if(this.n()>0)history.back();else fb&&fb()},
+ overlay(close){if(this.popping)return null;const r={n:null,x:0};this.run(()=>{if(r.x)return;this.push({o:1});r.n=this.n();this.ov[r.n]=close});return()=>{r.x=1;const n=r.n;if(n!=null&&this.ov[n]===close){delete this.ov[n];this.run(()=>{if(this.n()===n)this.back(1)})}}},
+ closeAbove(n){let c=0;for(const k of Object.keys(this.ov).map(Number).sort((a,b)=>b-a))if(k>n){const f=this.ov[k];delete this.ov[k];try{f()}catch(e){}c++}return c},
+ restore(s){this.popping=true;try{const v=s?.v||'home';
+   if(v==='chat'&&CT.find(x=>x.id===s.id)){openChat(s.id);if(s.bottom===false&&s.scroll!=null){stick=false;const sc=$('#c-scroll');const f=()=>{sc.scrollTop=s.scroll;updNew()};f();requestAnimationFrame(f)}}
+   else if(v==='detail'&&s.id){String(s.id).startsWith('g:')?openGroup(s.id.slice(2)):openDetail(s.id)}
+   else if(v==='settings')go('settings');
+   else if(v==='edit'){const c=CH.find(x=>x.id===s.id);editChar(c||null)}
+   else if(v==='lore'&&LB.find(x=>x.id===s.id))openLore(s.id);
+   else go('home',s?.tab)}finally{this.popping=false}},
+ init(){addEventListener('popstate',e=>{const s=e.state&&e.state.rp?e.state:null,n=s?s.n:0;
+   if(this.silent>0){this.silent--;this.closeAbove(n);if(!this.silent){clearTimeout(this.qt);this.flush()}return}
+   const closed=this.closeAbove(n);
+   if(s&&s.o){if(!this.ov[n])history.back();return}
+   if(closed&&this.same(s,this.desc(document.querySelector('.view.on')?.id?.slice(2)||'home')))return;
+   this.restore(s||{v:'home',n:0})});
+  const s=this.st();let saved=null;try{saved=JSON.parse(sessionStorage.getItem('rp_nav')||'null')}catch(e){}
+  if(s&&s.n>0&&!s.o&&Array.isArray(saved)&&saved.length>=s.n){this.stack=saved;this.restore(s)}
+  else if(s&&s.n>0){/* reloaded deep without a saved stack (or on a stale modal entry): rebuild a sane base */this.stack=[];this.replace({v:'home',tab:homeTab});if(s.o)history.back()}
+  else{this.stack=[];this.replace({v:'home',tab:homeTab})}}
+};
 
 /* ---------- HOME ---------- */
 document.querySelectorAll('.tabs button[data-t]').forEach(b=>b.onclick=()=>{homeTab=b.dataset.t;renderHome()});
@@ -756,7 +801,7 @@ function openDetail(id){const c=CH.find(x=>x.id===id);if(!c)return go('home');cu
   if(t?.dataset.del){confirmDo('Xóa cuộc chat này?',async()=>{await DB.del('chats',ch.id);CT=CT.filter(x=>x!==ch);openDetail(c.id)});return}openChat(ch.id)})}
 /* ---------- EDIT CHARACTER ---------- */
 function editChar(c){const isNew=!c;c=c?structuredClone(c):{id:uid(),name:'',avatar:'',description:'',personality:'',scenario:'',mes_example:'',greetings:[''],tags:[],bio:'',lorebooks:[],created:Date.now()};
- go('edit');$('#e-title').textContent=isNew?'Tạo nhân vật':'Sửa: '+c.name;const B=$('#e-body');
+ NAV.editId=isNew?null:c.id;go('edit');$('#e-title').textContent=isNew?'Tạo nhân vật':'Sửa: '+c.name;const B=$('#e-body');
  const draw=()=>{B.innerHTML=`<div class="row"><div class="av" id="e-av" style="width:96px;height:96px;border-radius:20px;background-image:url('${c.avatar}');cursor:pointer;display:flex;align-items:center;justify-content:center">${c.avatar?'':'{i:camera}'}</div><div style="flex:1"><label>Tên</label><input id="f-name" value="${esc(c.name)}"><button class="btn-g avp" id="e-avpst">{i:image} Dán ảnh đại diện</button></div></div>
  <label>Giới thiệu ngắn (hiện trên thẻ)</label><input id="f-bio" value="${esc(c.bio)}">
  <label>Tags (phân cách bằng dấu phẩy)</label><input id="f-tags" value="${esc(c.tags.join(', '))}">
@@ -853,7 +898,7 @@ let pending=[],busy=false;
 function applyBg(){const ch=cur.chat;const sc=$('#c-scroll');const img=ch?.bg||S.bgImage;if(img){const d=(+S.bgDim||0)/100;sc.classList.add('bg');sc.style.setProperty('--cbg',`linear-gradient(rgba(12,10,20,${d}),rgba(12,10,20,${d})),url('${img}')`)}else{sc.classList.remove('bg');sc.style.removeProperty('--cbg')}}
 function openChat(id){const ch=CT.find(x=>x.id===id);const ms=members(ch);const c=ms[0];if(!ch||!c)return toast('Không tìm thấy chat');const g=gOf(ch);cur={char:c,chat:ch,group:g};go('chat');
  $('#c-title').textContent=isGroup(ch)?(g?.name||ch.title):c.name;$('#c-av').style.backgroundImage=`url('${isGroup(ch)&&gAv(g)||c.avatar}')`;$('#c-av').style.borderRadius=isGroup(ch)?'12px':'';pending=[];applyBg();drawPrev();drawBars();drawMsgs(true)}
-$('#c-back').onclick=()=>{const g=gOf(cur.chat);g?openGroup(g.id):openDetail(cur.char.id)};
+$('#c-back').onclick=()=>NAV.appBack(()=>{const g=gOf(cur.chat);g?openGroup(g.id):openDetail(cur.char.id)});
 $('#c-more').onclick=e=>{const{char:c,chat:ch}=cur;menu(e.currentTarget,[['{i:chat} Chat mới',()=>isGroup(ch)?newGroupChat(gOf(ch)||ch.members):newChat(c)],!isGroup(ch)&&['{i:wave} Đổi lời chào',()=>changeGreeting()],
  ['{i:note} Ghi chú tác giả',()=>showAN()],['{i:persona} Persona: '+uName(ch),()=>showPersonaPick()],isGroup(ch)&&['{i:users} Nhóm: lượt nói & tắt tiếng',()=>showGroup()],isGroup(ch)&&gOf(ch)&&['{i:edit} Sửa nhóm (tên, ảnh, thành viên)',()=>editGroup(gOf(ch))],
  ['{i:memory} Bộ nhớ trò chuyện',()=>showMemory()],['{i:search} Xem lore được kích hoạt',()=>showLore()],['{i:gauge} Prompt & token',()=>showPrompt()],['{i:palette} Ảnh nền chat',()=>showBg()],
@@ -922,7 +967,7 @@ function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');c
   ${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
   <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button><button data-a="cont" title="Tiếp tục">{i:forward}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(errText?`<div class="errbox">${esc(errText)}</div>`:'')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
  const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),f=B.querySelector('.m'),id=f?.dataset.i,y0=f?f.getBoundingClientRect().top:0;stick=false;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);const fix=()=>{const e=id!=null&&B.querySelector(`.m[data-i="${id}"]`);if(e)sc.scrollTop+=e.getBoundingClientRect().top-y0};fix();requestAnimationFrame(()=>{fix();setTimeout(fix,250)})};
- B.querySelectorAll('.bub img').forEach(im=>im.onclick=()=>{$('#imgview img').src=im.src;$('#imgview').style.display='flex'});
+ B.querySelectorAll('.bub img').forEach(im=>im.onclick=()=>{const v=$('#imgview');v.querySelector('img').src=im.src;v.style.display='flex';const done=NAV.overlay(()=>{v.style.display='none'});v.onclick=()=>{v.style.display='none';done&&done()}});
  B.querySelectorAll('[data-a]').forEach(b=>b.onclick=ev=>msgAction(+b.closest('.m').dataset.i,b.dataset.a,ev.currentTarget));
  B.querySelectorAll('[data-ck]').forEach(b=>b.onclick=()=>openChat(b.dataset.ck));
  updSend();drawBars();scrollDown(force)}
@@ -1019,7 +1064,7 @@ async function importChatJsonl(c){const fs=await pick('.jsonl,.json,application/
 async function importLore(){const fs=await pick('.json,application/json',true);let n=0;for(const f of fs){try{const l=parseLorebook(JSON.parse(await readFile(f)),f.name.replace(/\.json$/i,''));await saveLore(l);LB.push(l);n++}catch(e){alert(f.name+': '+e.message)}}
  if(n){toast(`Đã nhập ${n} lorebook`);homeTab='lore';renderHome()}}
 let lq='';
-function openLore(id){const l=LB.find(x=>x.id===id);if(!l)return;go('lore');$('#l-title').textContent=l.name;const B=$('#l-body');
+function openLore(id){const l=LB.find(x=>x.id===id);if(!l)return;NAV.loreId=id;go('lore');$('#l-title').textContent=l.name;const B=$('#l-body');
  const draw=()=>{const list=l.entries.map((e,i)=>[e,i]).filter(([e])=>!lq||(e.comment+' '+e.keys.join(' ')+' '+e.content).toLowerCase().includes(lq.toLowerCase()));
   B.innerHTML=`<div class="search"><input id="lq" placeholder="Tìm mục…" value="${esc(lq)}"></div><div class="mut" style="margin-bottom:8px">${list.length}/${l.entries.length} mục</div><div class="list">${list.map(([e,i])=>`<div class="it" data-i="${i}" style="${e.enabled?'':'opacity:.45'}"><div class="t"><b>${e.constant?'{i:pin} ':''}${esc(e.comment||'(không tên)')}</b><small>{i:key} ${esc(e.keys.join(', ').slice(0,90))}</small><small>order ${e.order} · ${e.content.length} ký tự${e.sticky?' · dính '+e.sticky:''}${e.cooldown?' · hồi '+e.cooldown:''}${e.group?' · nhóm '+esc(e.group):''}${+e.position===4?' · @'+e.depth:''}</small></div><input type="checkbox" data-tg="${i}" ${e.enabled?'checked':''} title="Bật/tắt"></div>`).join('')}</div><button class="btn-g" id="l-add" style="width:100%">{i:plus} Thêm mục</button>`;
   const qi=$('#lq');qi.oninput=()=>{lq=qi.value;const p=qi.selectionStart;draw();const n=$('#lq');n.focus();n.setSelectionRange(p,p)};
@@ -1127,7 +1172,7 @@ Trong tin bạn gửi, macro (vd xúc xắc) được tính ngay lúc gửi.</p>
  <button class="btn-g" id="s-rxadd">{i:plus} Thêm script</button>`)+
  sec('sec-qr','{i:zap} Trả lời nhanh',`${sw('s-showQr',S.showQr,'Hiện thanh trả lời nhanh trên khung chat')}<p class="hint">Bật "Gửi" để bấm là gửi luôn; tắt để chỉ chèn vào ô nhập. Hỗ trợ macro.</p><div id="s-qr" style="margin-top:8px">${S.qr.map((q,i)=>`<div class="lrow" data-qr="${i}"><input data-f="label" placeholder="Nhãn" value="${esc(q.label)}" style="width:34%"><input class="grow" data-f="text" placeholder="Nội dung" value="${esc(q.text)}"><label class="sw2"><input type="checkbox" data-f="send" ${q.send?'checked':''}> Gửi</label><button class="icon" data-qrd="${i}">{i:trash}</button></div>`).join('')}</div>
  <div class="row"><button class="btn-g" id="s-qradd">{i:plus} Thêm nút</button><button class="btn-g" id="s-qrdef">Khôi phục mẫu</button></div>`)+
- sec('sec-ui','{i:palette} Giao diện',`${sw('s-stream',S.stream!==false,'Hiện chữ chạy từng chữ (streaming) – tắt để nhân vật soạn xong rồi mới hiện cả tin')}${sw('s-lite',S.lite!==false,'Chế độ nhẹ (tắt hiệu ứng chuyển động – mượt hơn trên điện thoại)')}<p class="hint">Giao diện xám phẳng, không hiệu ứng nền.</p>
+ sec('sec-ui','{i:palette} Giao diện',`${sw('s-stream',S.stream!==false,'Hiện chữ chạy từng chữ (streaming) – tắt để nhân vật soạn xong rồi mới hiện cả tin')}${sw('s-imgDirect',S.imgDirect!==false,'Khi dùng proxy mà tin có ảnh: gửi thẳng tới Gemini API (cần Gemini key AIza…) – vì proxy Colab bỏ qua ảnh nên nhân vật không thấy')}${sw('s-lite',S.lite!==false,'Chế độ nhẹ (tắt hiệu ứng chuyển động – mượt hơn trên điện thoại)')}<p class="hint">Giao diện xám phẳng, không hiệu ứng nền.</p>
  <label>Ảnh nền chat chung</label><div class="row"><button class="btn-g" id="s-bg">{i:image} Chọn ảnh</button><button class="btn-d" id="s-bgx" ${S.bgImage?'':'disabled'}>Bỏ ảnh</button>${S.bgImage?`<div class="av" style="width:44px;height:44px;border-radius:12px;background-image:url('${S.bgImage}')"></div>`:''}</div>
  <label>Độ tối lớp phủ ảnh nền: <b id="s-bgdv">${S.bgDim}%</b></label><input type="range" id="s-bgDim" min="0" max="95" value="${S.bgDim}">`)+
  sec('sec-data','{i:save} Dữ liệu',`<p class="mut">Lưu trữ: ${DB.mem?'localStorage (dự phòng)':'IndexedDB'} · ${CH.length} nhân vật · ${LB.length} lorebook · ${CT.length} chat · ${GR.length} nhóm</p><div class="row"><button class="btn-g" id="s-exp">{i:download} Sao lưu tất cả (JSON)</button><button class="btn-g" id="s-imp">{i:upload} Khôi phục từ file</button><button class="btn-d" id="s-wipe">Xóa toàn bộ</button></div><p class="mut">File sao lưu gồm nhân vật, lorebook, chat (kèm ảnh), persona, regex, cài đặt – KHÔNG gồm API key hay Proxy key.</p>`);
@@ -1166,7 +1211,7 @@ function collectS(){const g=id=>document.getElementById('s-'+id);if(!g('model'))
  const k=g('key').value.trim();k?localStorage.setItem('rp_apikey',k):localStorage.removeItem('rp_apikey');
  for(const f of['model','sysPrompt','source','jailbreak','anDefault','contNudge','impPrompt','stopStrings'])S[f]=g(f).value;
  for(const f of['temperature','maxTokens','topP','scanDepth','loreBudget','imgLimit','topK','minP','repPen','freqPen','presPen','maxContext','anDepth','anFreq','bgDim'])S[f]=Number(g(f).value);
- for(const f of['civic','autoSum','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
+ for(const f of['civic','autoSum','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream','imgDirect'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
  S.regex=[...document.querySelectorAll('[data-rx]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o});
  S.qr=[...document.querySelectorAll('[data-qr]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o}).filter(q=>q.label.trim()||q.text.trim());
  if(!S.model.trim())S.model=DEF.model;if(!(+S.maxContext>0))S.maxContext=DEF.maxContext;S.userName=P(null)?.name||S.userName}
@@ -1302,6 +1347,6 @@ async function seed(manual){const P=await getSeed();if(!P)return;if(manual&&!con
  else{await updateBuiltinLore(P);const haveL=new Set(LB.map(l=>l.id)),haveC=new Set(CH.map(c=>c.id));for(const l of P.lorebooks)if(!haveL.has(l.id))await saveLore(l);for(const c of P.chars)if(!haveC.has(c.id))await saveChar(c)}
  localStorage.setItem('rp_seeded','1');localStorage.setItem('rp_seed_ver',String(SEED_VER));await loadAll();if(manual){toast('Đã nhập dữ liệu mẫu');renderHome()}}
 (async()=>{if(migrateProxy())toast('Đã chuyển proxy cũ thành cấu hình “Proxy 1”',3000);applyActiveProxy();await DB.open();await loadAll();document.body.classList.toggle('lite',S.lite!==false);if((window.PRELOAD||window.SEED_URL)&&(!localStorage.getItem('rp_seeded')||Number(localStorage.getItem('rp_seed_ver')||0)<SEED_VER))await seed(false);if(await migrateGroups())await loadAll();renderHome();
- if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);SY.init()})();
-window.RP={SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
+ if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);NAV.init();SY.init()})();
+window.RP={NAV,SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
 </script></body></html>
