@@ -229,6 +229,10 @@ pre.pv{background:#26272a!important;border-color:#45464c!important}
 .m.last,.m:has(textarea){content-visibility:visible}
 #c-older{display:block;margin:0 auto 14px}
 .lite *,.lite *:before,.lite *:after{transition:none!important}
+input[type=range]{accent-color:#cfd0d4}
+.typing{display:inline-flex;align-items:center;gap:3px;color:#9a9ba0;font-style:italic;font-size:14px}.typing i{width:5px;height:5px;border-radius:50%;background:#9a9ba0;display:inline-block;animation:tdot 1.2s infinite ease-in-out!important}.typing i:nth-child(2){animation-delay:.2s!important}.typing i:nth-child(3){animation-delay:.4s!important}
+.tx.nost.cursor:after{content:none}
+@keyframes tdot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 </style></head><body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.5V20a.5.5 0 0 0 .5.5h3.5V15a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v5.5H18a.5.5 0 0 0 .5-.5V9.5"/></symbol>
@@ -323,7 +327,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=e3d361e099';
+window.SEED_URL='seed.json?v=1e8192f7dd';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -609,7 +613,7 @@ function toOpenAI(body,stops){const msgs=[{role:'system',content:body.systemInst
  for(const c of body.contents){const hasImg=c.parts.some(p=>p.inlineData);const role=c.role==='model'?'assistant':'user';
   if(hasImg&&role==='user')msgs.push({role,content:c.parts.map(p=>p.inlineData?{type:'image_url',image_url:{url:`data:${p.inlineData.mimeType};base64,${p.inlineData.data}`}}:{type:'text',text:p.text})});
   else msgs.push({role,content:c.parts.map(p=>p.text||'').join('')})}
- const g=body.generationConfig||{};const o={model:S.proxyModel.trim(),messages:msgs,temperature:g.temperature??+S.temperature,max_tokens:g.maxOutputTokens??+S.maxTokens,top_p:g.topP??+S.topP,stream:true};
+ const g=body.generationConfig||{};const o={model:S.proxyModel.trim(),messages:msgs,temperature:g.temperature??+S.temperature,max_tokens:g.maxOutputTokens??+S.maxTokens,top_p:g.topP??+S.topP,stream:STREAM()};
  if(stops!==undefined){if(+S.topK>0)o.top_k=+S.topK;if(+S.minP>0)o.min_p=+S.minP;if(+S.repPen&&+S.repPen!==1)o.repetition_penalty=+S.repPen;if(+S.freqPen)o.frequency_penalty=+S.freqPen;if(+S.presPen)o.presence_penalty=+S.presPen;if(stops?.length)o.stop=stops.slice(0,4)}
  return o}
 async function proxyStream(body,onText){const key=getProxyKey(),url=normProxyUrl(S.proxyUrl);
@@ -650,13 +654,15 @@ function showMemory(){const{char:c,chat:ch}=cur;modal(`<h3>{i:brain} Bộ nhớ 
  m.querySelector('#mm-save').onclick=async()=>{ch.memory=m.querySelector('#mm-mem').value;ch.summary=m.querySelector('#mm-sum').value;await saveChat(ch);toast('Đã lưu bộ nhớ');m.remove()};
  m.querySelector('#mm-clr').onclick=async()=>{ch.summary='';ch.sumUpTo=null;m.querySelector('#mm-sum').value='';await saveChat(ch);info()};
  m.querySelector('#mm-now').onclick=async e=>{if(busy)return toast('Đang tạo câu trả lời, đợi xong đã.');ch.memory=m.querySelector('#mm-mem').value;ch.summary=m.querySelector('#mm-sum').value;e.target.disabled=true;await summarize(c,ch,true);e.target.disabled=false;m.querySelector('#mm-sum').value=ch.summary||'';info()}})}
-const aiStream=(req,onText)=>S.source==='proxy'?proxyStream(req.oai,onText):geminiStream(req.body,onText);
+const STREAM=()=>S.stream!==false;
+async function aiStream(req,onText){const fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
+ if(STREAM())return fn(onText);const r=await fn(()=>{});if(r.text)onText(r.text);return r}
 
 /* ---------- GEMINI STREAM ---------- */
 let abortCtl=null;
 function explainErr(status,msg){const m={400:'400 – Yêu cầu không hợp lệ (sai model, tham số hoặc nội dung).',401:'401 – API key không hợp lệ.',403:'403 – API key không có quyền / bị chặn / chưa bật Gemini API.',404:'404 – Không tìm thấy model. Kiểm tra tên model trong Cài đặt.',429:'429 – Vượt giới hạn (quota/rate limit). Đợi một lúc hoặc đổi model.',500:'500 – Lỗi máy chủ Google. Thử lại.',503:'503 – Model quá tải. Thử lại sau.'};return(m[status]||('HTTP '+status))+(msg?'\n'+msg:'')}
 async function geminiStream(body,onText){const key=getKey();if(!key)throw new Error('Chưa có Gemini API key (đang dùng nguồn Gemini API). Vào {i:gear} Cài đặt để dán key, hoặc chuyển sang Proxy.');
- abortCtl=new AbortController();const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.model.trim())}:streamGenerateContent?alt=sse`;
+ abortCtl=new AbortController();const ns=!STREAM();const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.model.trim())}:`+(ns?'generateContent':'streamGenerateContent?alt=sse');
  let res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal});
  const post=()=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal});
  const gc=body.generationConfig||{};const EXTRA=['topK','presencePenalty','frequencyPenalty','stopSequences'];
@@ -665,10 +671,14 @@ async function geminiStream(body,onText){const key=getKey();if(!key)throw new Er
   if(EXTRA.some(k=>k in gc)){for(const k of['presencePenalty','frequencyPenalty','topK'])delete gc[k];if(/stop/i.test(t))delete gc.stopSequences;res=await post();continue}
   throw new Error(explainErr(400,errMsg(t)))}
  if(!res.ok){throw new Error(explainErr(res.status,errMsg(await res.text())))}
- const rd=res.body.getReader(),dec=new TextDecoder();let buf='',full='',finish='',block='';
- const handle=line=>{line=line.trim();if(!line.startsWith('data:'))return;const js=line.slice(5).trim();if(!js||js==='[DONE]')return;let j;try{j=JSON.parse(js)}catch(e){return}
-  if(j.error)throw new Error(explainErr(j.error.code,j.error.message));if(j.promptFeedback?.blockReason)block=j.promptFeedback.blockReason;
+ let buf='',full='',finish='',block='';
+ const handle=line=>{line=line.trim();if(!line.startsWith('data:'))return;const js=line.slice(5).trim();if(!js||js==='[DONE]')return;let j;try{j=JSON.parse(js)}catch(e){return}hObj(j)};
+ const hObj=j=>{if(j.error)throw new Error(explainErr(j.error.code,j.error.message));if(j.promptFeedback?.blockReason)block=j.promptFeedback.blockReason;
   const c=j.candidates?.[0];if(c){const t=(c.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');if(t){full+=t;onText(full)}if(c.finishReason)finish=c.finishReason}};
+ const ct=res.headers.get('content-type')||'';
+ if(ns||!/event-stream/i.test(ct)){const t=await res.text();let j=null;try{j=JSON.parse(t)}catch(e){}
+  if(j){for(const o of[].concat(j))hObj(o);return{text:full,finish,block}}for(const line of t.split('\n'))handle(line);return{text:full,finish,block}}
+ const rd=res.body.getReader(),dec=new TextDecoder();
  while(true){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf('\n'))>=0){handle(buf.slice(0,i));buf=buf.slice(i+1)}}handle(buf);
  return{text:full,finish,block}}
 function errMsg(t){try{return JSON.parse(t).error?.message||t}catch(e){return String(t).slice(0,400)}}
@@ -872,7 +882,7 @@ function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');c
  const gg=gOf(ch);B.innerHTML=(from>0?`<button class="btn-g" id="c-older">{i:chevron-down} Xem ${from} tin cũ hơn</button>`:'')+ch.messages.slice(from).map((m,i0)=>{const i=i0+from;const u=m.role==='user';const c=u?c0:msgChar(m,ch,c0);const nar=!!m.narrator;
   const ck=m.ckpt?CT.find(x=>x.id===m.ckpt.id):null;
   return`<div class="m ${u?'u':''} ${i===n-1?'last':''}" data-i="${i}"><div class="av ${u&&per?.avatar?'pav':''}" style="${u?(per?.avatar?`--pav:url('${per.avatar}')`:''):`background-image:url('${nar?(gAv(gg)||c.avatar):c.avatar}')${nar?';border-radius:12px':''}`}"></div><div class="bub"><div class="who">${esc(u?per?.name||'User':nar?(gg?.name||'Mở đầu')+' · mở đầu':c.name)}</div>
-  ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''}">${render(shown(m,c,ch))}</div>
+  ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${render(shown(m,c,ch))}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
   ${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
   <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button><button data-a="cont" title="Tiếp tục">{i:forward}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(errText?`<div class="errbox">${esc(errText)}</div>`:'')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
  const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),h0=sc.scrollHeight,t0=sc.scrollTop;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);sc.scrollTop=t0+(sc.scrollHeight-h0)};
@@ -913,7 +923,7 @@ function planSpeakers(ch,text,fromUser){const ms=members(ch).filter(c=>!ch.muted
  if(fromUser){const named=mentioned(ms,text);if(named.length)return named}return[pickSpeaker(ch,text)]}
 function nextSpeakerPreview(){const ch=cur.chat;if(!isGroup(ch))return cur.char;const l=ch.messages[ch.messages.length-1];return l&&l.role!=='user'?msgChar(l,ch,cur.char):members(ch).find(c=>!ch.muted?.includes(c.id))||cur.char}
 let impBusy=false;
-async function impersonate(){const{char:c0,chat:ch}=cur;if(busy)return;const c=nextSpeakerPreview();const ta=$('#c-in');const old=ta.value;busy=impBusy=true;updSend();drawBars();ta.value='';ta.placeholder='Đang viết thay bạn…';let hit=false;
+async function impersonate(){const{char:c0,chat:ch}=cur;if(busy)return;const c=nextSpeakerPreview();const ta=$('#c-in');const old=ta.value;busy=impBusy=true;updSend();drawBars();ta.value='';ta.placeholder=STREAM()?'Đang viết thay bạn…':'Đang soạn tin thay bạn… (chờ chút)';let hit=false;
  try{const req=buildRequest(c,ch,ch.messages,S.impPrompt||DEF_IMP,{mode:'imp'});
   const r=await aiStream(req,t=>{const k=cutStop(t,req.stops);if(k!=null){t=k;if(!hit){hit=true;abortCtl?.abort()}}ta.value=t.trim();grow()});if(!ta.value.trim()&&!hit){ta.value=old;toast(finishNote(r)||'Không có nội dung')}}
  catch(e){if(e.name!=='AbortError'){ta.value=old;toast('{i:close} '+e.message,4000)}}finally{busy=impBusy=false;abortCtl=null;ta.placeholder='Nhập tin nhắn… (bắt đầu bằng OOC để nói ngoài vai)';updSend();drawBars();grow();ta.focus()}}
@@ -1036,7 +1046,7 @@ function editProxy(p0,done){const isNew=!p0;const n=(getProxies()||[]).length;co
    Q('#px-ml').innerHTML=ids.map(i=>`<option value="${esc(i)}">`).join('');const sel=Q('#px-ms');sel.innerHTML='<option value="">— chọn model ('+ids.length+') —</option>'+ids.map(i=>`<option ${i===Q('#px-m').value?'selected':''}>${esc(i)}</option>`).join('');sel.style.display='';res.textContent='{i:check} Lấy được '+ids.length+' model – chọn ở danh sách hoặc gõ tay.'}
   catch(e){res.textContent='{i:close} Không lấy được model ('+e.message+'). Bạn vẫn có thể gõ tên model.'}};
  Q('#px-te').onclick=async()=>{const bak=[S.proxyUrl,S.proxyModel],kb=localStorage.getItem('rp_proxykey');S.proxyUrl=Q('#px-u').value;S.proxyModel=Q('#px-m').value;const k=Q('#px-k').value.trim();k?localStorage.setItem('rp_proxykey',k):localStorage.removeItem('rp_proxykey');res.textContent='Đang kiểm tra…';
-  try{const r=await proxyStream({model:S.proxyModel.trim(),messages:[{role:'user',content:'Say OK.'}],max_tokens:16,stream:true},()=>{});res.textContent='{i:check} Kết nối OK ('+normProxyUrl(S.proxyUrl)+')\nTrả lời: '+(r.text||'(rỗng)').slice(0,200)}
+  try{const r=await proxyStream({model:S.proxyModel.trim(),messages:[{role:'user',content:'Say OK.'}],max_tokens:16,stream:STREAM()},()=>{});res.textContent='{i:check} Kết nối OK ('+normProxyUrl(S.proxyUrl)+')\nTrả lời: '+(r.text||'(rỗng)').slice(0,200)}
   catch(e){res.textContent='{i:close} '+e.message}finally{abortCtl=null;[S.proxyUrl,S.proxyModel]=bak;kb?localStorage.setItem('rp_proxykey',kb):localStorage.removeItem('rp_proxykey')}};
  Q('#px-x').onclick=()=>m.remove();
  const d=Q('#px-del');if(d)d.onclick=()=>confirmDo('Xóa proxy "'+p.name+'"?',()=>{const b=(getProxies()||[]).filter(x=>x.id!==p.id);setProxies(b);if(activeProxyId()===p.id){b[0]?localStorage.setItem('rp_proxy_active',b[0].id):localStorage.removeItem('rp_proxy_active')}applyActiveProxy();m.remove();done&&done()});
@@ -1078,7 +1088,7 @@ Trong tin bạn gửi, macro (vd xúc xắc) được tính ngay lúc gửi.</p>
  <button class="btn-g" id="s-rxadd">{i:plus} Thêm script</button>`)+
  sec('sec-qr','{i:zap} Trả lời nhanh',`${sw('s-showQr',S.showQr,'Hiện thanh trả lời nhanh trên khung chat')}<p class="hint">Bật "Gửi" để bấm là gửi luôn; tắt để chỉ chèn vào ô nhập. Hỗ trợ macro.</p><div id="s-qr" style="margin-top:8px">${S.qr.map((q,i)=>`<div class="lrow" data-qr="${i}"><input data-f="label" placeholder="Nhãn" value="${esc(q.label)}" style="width:34%"><input class="grow" data-f="text" placeholder="Nội dung" value="${esc(q.text)}"><label class="sw2"><input type="checkbox" data-f="send" ${q.send?'checked':''}> Gửi</label><button class="icon" data-qrd="${i}">{i:trash}</button></div>`).join('')}</div>
  <div class="row"><button class="btn-g" id="s-qradd">{i:plus} Thêm nút</button><button class="btn-g" id="s-qrdef">Khôi phục mẫu</button></div>`)+
- sec('sec-ui','{i:palette} Giao diện',`${sw('s-lite',S.lite!==false,'Chế độ nhẹ (tắt hiệu ứng chuyển động – mượt hơn trên điện thoại)')}<p class="hint">Giao diện xám phẳng, không hiệu ứng nền.</p>
+ sec('sec-ui','{i:palette} Giao diện',`${sw('s-stream',S.stream!==false,'Hiện chữ chạy từng chữ (streaming) – tắt để nhân vật soạn xong rồi mới hiện cả tin')}${sw('s-lite',S.lite!==false,'Chế độ nhẹ (tắt hiệu ứng chuyển động – mượt hơn trên điện thoại)')}<p class="hint">Giao diện xám phẳng, không hiệu ứng nền.</p>
  <label>Ảnh nền chat chung</label><div class="row"><button class="btn-g" id="s-bg">{i:image} Chọn ảnh</button><button class="btn-d" id="s-bgx" ${S.bgImage?'':'disabled'}>Bỏ ảnh</button>${S.bgImage?`<div class="av" style="width:44px;height:44px;border-radius:12px;background-image:url('${S.bgImage}')"></div>`:''}</div>
  <label>Độ tối lớp phủ ảnh nền: <b id="s-bgdv">${S.bgDim}%</b></label><input type="range" id="s-bgDim" min="0" max="95" value="${S.bgDim}">`)+
  sec('sec-data','{i:save} Dữ liệu',`<p class="mut">Lưu trữ: ${DB.mem?'localStorage (dự phòng)':'IndexedDB'} · ${CH.length} nhân vật · ${LB.length} lorebook · ${CT.length} chat · ${GR.length} nhóm</p><div class="row"><button class="btn-g" id="s-exp">{i:download} Sao lưu tất cả (JSON)</button><button class="btn-g" id="s-imp">{i:upload} Khôi phục từ file</button><button class="btn-d" id="s-wipe">Xóa toàn bộ</button></div><p class="mut">File sao lưu gồm nhân vật, lorebook, chat (kèm ảnh), persona, regex, cài đặt – KHÔNG gồm API key hay Proxy key.</p>`);
@@ -1116,7 +1126,7 @@ function collectS(){const g=id=>document.getElementById('s-'+id);if(!g('model'))
  const k=g('key').value.trim();k?localStorage.setItem('rp_apikey',k):localStorage.removeItem('rp_apikey');
  for(const f of['model','sysPrompt','source','jailbreak','anDefault','contNudge','impPrompt','stopStrings'])S[f]=g(f).value;
  for(const f of['temperature','maxTokens','topP','scanDepth','loreBudget','imgLimit','topK','minP','repPen','freqPen','presPen','maxContext','anDepth','anFreq','bgDim'])S[f]=Number(g(f).value);
- for(const f of['civic','autoSum','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
+ for(const f of['civic','autoSum','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
  S.regex=[...document.querySelectorAll('[data-rx]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o});
  S.qr=[...document.querySelectorAll('[data-qr]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o}).filter(q=>q.label.trim()||q.text.trim());
  if(!S.model.trim())S.model=DEF.model;if(!(+S.maxContext>0))S.maxContext=DEF.maxContext;S.userName=P(null)?.name||S.userName}
