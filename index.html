@@ -229,6 +229,7 @@ pre.pv{background:#26272a!important;border-color:#45464c!important}
 #c-newmsg{position:sticky;bottom:12px;display:none;margin:0 auto;width:max-content;z-index:5;padding:8px 14px;border-radius:999px;background:#e6e6e6!important;color:#1f2023!important;border:0;font-size:13.5px;font-weight:600}
 #c-older{display:block;margin:0 auto 14px}
 .lite *,.lite *:before,.lite *:after{transition:none!important}
+#h-acc{position:relative}#h-acc:after{content:"";position:absolute;right:7px;top:7px;width:8px;height:8px;border-radius:50%;display:none}#h-acc[data-st=ok]:after{display:block;background:#7bd88f}#h-acc[data-st=syncing]:after,#h-acc[data-st=pending]:after{display:block;background:#e6c35c}#h-acc[data-st=offline]:after{display:block;background:#9a9ba0}#h-acc[data-st=error]:after{display:block;background:#e57373}
 #pz{min-height:120px;border:2px dashed #55565c;border-radius:16px;padding:14px;color:#9a9ba0;background:#2b2c30;outline:none;overflow:auto;max-height:240px;-webkit-user-select:text;user-select:text}#pz:focus{border-color:#9a9ba0}#pz img{max-width:100%;max-height:180px}
 .avp{font-size:12.5px;padding:6px 10px;margin-top:6px}
 input[type=range]{accent-color:#cfd0d4}
@@ -273,7 +274,7 @@ input[type=range]{accent-color:#cfd0d4}
 
 <!-- HOME -->
 <section class="view on" id="v-home">
- <header><h1><span class="logo"><svg class="mark" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs><path d="M5 5h14a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 19 18h-7l-5 3.5V18H5a2.5 2.5 0 0 1-2.5-2.5v-8A2.5 2.5 0 0 1 5 5z" fill="none" stroke="url(#lg)" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 8.2l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" fill="url(#lg)"/></svg><span class="wm">RP<b>Chat</b></span></span></h1><button class="icon" onclick="go('settings')" title="Cài đặt">{i:gear}</button></header>
+ <header><h1><span class="logo"><svg class="mark" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs><path d="M5 5h14a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 19 18h-7l-5 3.5V18H5a2.5 2.5 0 0 1-2.5-2.5v-8A2.5 2.5 0 0 1 5 5z" fill="none" stroke="url(#lg)" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 8.2l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" fill="url(#lg)"/></svg><span class="wm">RP<b>Chat</b></span></span></h1><button class="icon" id="h-acc" onclick="showAccount()" title="Tài khoản" data-st="none">{i:user}</button><button class="icon" onclick="go('settings')" title="Cài đặt">{i:gear}</button></header>
  <div class="scroll"><div class="pad" id="home-body"></div></div>
  <nav class="tabs bnav"><button class="on" data-t="chars">{i:home}<span>Nhân vật</span></button><button data-t="groups">{i:users}<span>Nhóm</span></button><button data-t="recent">{i:chat}<span>Gần đây</span></button><button data-t="lore">{i:book}<span>Lorebook</span></button><button class="nset" onclick="go('settings')">{i:gear}<span>Cài đặt</span></button></nav>
  <button class="fab" id="fab" title="Tạo nhân vật">{i:plus}</button>
@@ -329,7 +330,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=6b13bae815';
+window.SEED_URL='seed.json?v=fb12567cb3';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -355,12 +356,12 @@ const DEF={model:'gemini-2.5-flash',temperature:0.9,maxTokens:2048,topP:0.95,top
 let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('rp_settings')||'{}'));
 if(!Array.isArray(S.personas)||!S.personas.length){S.personas=[{id:'p_default',name:S.userName||'User',desc:S.persona||'',avatar:''}];S.defPersona='p_default'}
 if(!Array.isArray(S.qr))S.qr=DEF_QR.map(x=>({...x}));if(!Array.isArray(S.regex))S.regex=[];
-const saveS=()=>{try{localStorage.setItem('rp_settings',JSON.stringify(S))}catch(e){toast('Bộ nhớ trình duyệt đầy – ảnh nền quá lớn?')}};
+const saveS=()=>{try{localStorage.setItem('rp_settings',JSON.stringify(S));if(typeof SY!=='undefined'){SY.mark('settings','main');SY.mark('secrets','keys')}}catch(e){toast('Bộ nhớ trình duyệt đầy – ảnh nền quá lớn?')}};
 const getKey=()=>localStorage.getItem('rp_apikey')||'';
 const getProxyKey=()=>localStorage.getItem('rp_proxykey')||'';
 /* ---------- PROXY CONFIGS (Janitor-style; keys live only in this browser's localStorage) ---------- */
 function getProxies(){try{const a=JSON.parse(localStorage.getItem('rp_proxies')||'null');return Array.isArray(a)?a:null}catch(e){return null}}
-function setProxies(a){localStorage.setItem('rp_proxies',JSON.stringify(a))}
+function setProxies(a){localStorage.setItem('rp_proxies',JSON.stringify(a));if(typeof SY!=='undefined'){SY.mark('proxies','list');SY.mark('secrets','keys')}}
 const activeProxyId=()=>localStorage.getItem('rp_proxy_active')||'';
 function activeProxy(){const a=getProxies()||[];return a.find(p=>p.id===activeProxyId())||a[0]||null}
 /* keep legacy single-proxy fields in sync with the active config so every request path keeps working */
@@ -1090,7 +1091,7 @@ function editProxy(p0,done){const isNew=!p0;const n=(getProxies()||[]).length;co
  const d=Q('#px-del');if(d)d.onclick=()=>confirmDo('Xóa proxy "'+p.name+'"?',()=>{const b=(getProxies()||[]).filter(x=>x.id!==p.id);setProxies(b);if(activeProxyId()===p.id){b[0]?localStorage.setItem('rp_proxy_active',b[0].id):localStorage.removeItem('rp_proxy_active')}applyActiveProxy();m.remove();done&&done()});
  Q('#px-ok').onclick=()=>{p.name=Q('#px-n').value.trim()||'Proxy';p.url=Q('#px-u').value.trim();p.key=Q('#px-k').value.trim();p.model=Q('#px-m').value.trim();
   const a=getProxies()||[];const i=a.findIndex(x=>x.id===p.id);i>=0?a[i]=p:a.push(p);setProxies(a);localStorage.setItem('rp_proxy_active',p.id);applyActiveProxy();S.source='proxy';saveS();const sel=$('#s-source');if(sel)sel.value='proxy';m.remove();toast('Đã lưu & đang dùng: '+p.name);done&&done()}})}
-function renderSettings(){const B=$('#s-body');B.innerHTML=
+function renderSettings(){const B=$('#s-body');B.innerHTML=`<div class="sec" style="display:flex;align-items:center;gap:10px">${icon('user')}<div style="flex:1;min-width:0"><b>Tài khoản</b><div class="hint" id="s-accst" style="margin:2px 0 0">${esc(SY.user()?SY.shown(SY.user().email)+' · '+SY.label():'Chưa đăng nhập – chỉ lưu trên máy này')}</div></div><button class="btn-g" id="s-acc">${SY.user()?'Quản lý':'Đăng nhập'}</button></div>`+
  sec('sec-api','{i:key} Gemini API',`<label>API key (chỉ lưu trong trình duyệt này – localStorage)</label><div class="row" style="flex-wrap:nowrap"><input id="s-key" type="password" autocomplete="off" value="${esc(getKey())}" placeholder="AIza…"><button class="btn-g" id="s-eye">{i:eye}</button></div>
  <label>Model</label><input id="s-model" list="models" value="${esc(S.model)}"><datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"><option value="gemini-2.5-flash-lite"></datalist>
  <div class="g3">${num('temperature','Temperature',S.temperature,'step="0.05" min="0" max="2"')}${num('maxTokens','Token trả lời',S.maxTokens)}${num('topP','Top P',S.topP,'step="0.01" min="0" max="1"')}</div>
@@ -1130,7 +1131,7 @@ Trong tin bạn gửi, macro (vd xúc xắc) được tính ngay lúc gửi.</p>
  <label>Ảnh nền chat chung</label><div class="row"><button class="btn-g" id="s-bg">{i:image} Chọn ảnh</button><button class="btn-d" id="s-bgx" ${S.bgImage?'':'disabled'}>Bỏ ảnh</button>${S.bgImage?`<div class="av" style="width:44px;height:44px;border-radius:12px;background-image:url('${S.bgImage}')"></div>`:''}</div>
  <label>Độ tối lớp phủ ảnh nền: <b id="s-bgdv">${S.bgDim}%</b></label><input type="range" id="s-bgDim" min="0" max="95" value="${S.bgDim}">`)+
  sec('sec-data','{i:save} Dữ liệu',`<p class="mut">Lưu trữ: ${DB.mem?'localStorage (dự phòng)':'IndexedDB'} · ${CH.length} nhân vật · ${LB.length} lorebook · ${CT.length} chat · ${GR.length} nhóm</p><div class="row"><button class="btn-g" id="s-exp">{i:download} Sao lưu tất cả (JSON)</button><button class="btn-g" id="s-imp">{i:upload} Khôi phục từ file</button><button class="btn-d" id="s-wipe">Xóa toàn bộ</button></div><p class="mut">File sao lưu gồm nhân vật, lorebook, chat (kèm ảnh), persona, regex, cài đặt – KHÔNG gồm API key hay Proxy key.</p>`);
- B.querySelectorAll('details.sec').forEach(d=>d.ontoggle=()=>d.open?openSecs.add(d.id):openSecs.delete(d.id));
+ $('#s-acc').onclick=()=>showAccount();B.querySelectorAll('details.sec').forEach(d=>d.ontoggle=()=>d.open?openSecs.add(d.id):openSecs.delete(d.id));
  $('#s-eye').onclick=()=>{const k=$('#s-key');k.type=k.type==='password'?'text':'password'};wireProxyList();$('#s-source').onchange=e=>{S.source=e.target.value;saveS();toast(S.source==='proxy'?'Đang dùng Proxy: '+(activeProxy()?.name||'(chưa có)'):'Đang dùng Gemini API')};
  $('#s-reset').onclick=()=>{$('#s-sysPrompt').value=DEFAULT_SYS};
  const rer=()=>{collectS();saveS();renderSettings()};
@@ -1170,6 +1171,123 @@ function collectS(){const g=id=>document.getElementById('s-'+id);if(!g('model'))
  S.qr=[...document.querySelectorAll('[data-qr]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o}).filter(q=>q.label.trim()||q.text.trim());
  if(!S.model.trim())S.model=DEF.model;if(!(+S.maxContext>0))S.maxContext=DEF.maxContext;S.userName=P(null)?.name||S.userName}
 $('#s-save').onclick=()=>{collectS();saveS();toast('Đã lưu cài đặt')};
+/* ---------- ACCOUNT + CLOUD SYNC (Supabase: Auth + one RLS-protected table) ---------- */
+const SB_URL='https://bfwooynhhxjspkksrmkb.supabase.co',SB_KEY='sb_publishable_QSLbpZ151agmVR3UPWo5hQ_AGbtYtAr';/* public client key – safe to embed; data is protected by Row Level Security */
+const SY={state:'off',err:'',busy:false,applying:false,timer:0,again:false,
+ KINDS:['chars','lore','chats','groups'],
+ sess(){try{return JSON.parse(localStorage.getItem('rp_auth')||sessionStorage.getItem('rp_auth')||'null')}catch(e){return null}},
+ setSess(s,remember){localStorage.removeItem('rp_auth');sessionStorage.removeItem('rp_auth');if(s)(remember?localStorage:sessionStorage).setItem('rp_auth',JSON.stringify(s))},
+ remembered(){return !!localStorage.getItem('rp_auth')},
+ meta(){try{return JSON.parse(localStorage.getItem('rp_sync')||'null')||{}}catch(e){return{}}},
+ saveMeta(m){try{localStorage.setItem('rp_sync',JSON.stringify(m))}catch(e){}},
+ keysOn(){return localStorage.getItem('rp_sync_keys')==='1'},
+ user(){const s=this.sess();return s?.user||null},
+ shown(e){return String(e||'').replace(/@rpchat\.local$/,'')},
+ toEmail(u){u=String(u||'').trim();if(u.includes('@'))return u.toLowerCase();if(!/^[A-Za-z0-9._-]{3,32}$/.test(u))throw new Error('Tên đăng nhập 3–32 ký tự, chỉ gồm chữ, số, dấu . _ -');return u.toLowerCase()+'@rpchat.local'},
+ errVi(j,st){const m=(j&&(j.msg||j.message||j.error_description||j.error))||'';
+  if(st===429||/rate limit/i.test(m))return'Thử quá nhiều lần – đợi một lúc rồi thử lại.';
+  if(/invalid login credentials/i.test(m))return'Sai tên đăng nhập hoặc mật khẩu.';
+  if(/already registered|already exists/i.test(m))return'Tên đăng nhập/email này đã có người dùng.';
+  if(/password should be at least|weak/i.test(m))return'Mật khẩu quá ngắn (ít nhất 6 ký tự).';
+  if(/invalid.*email|validate email/i.test(m))return'Email không hợp lệ.';
+  return m||('Lỗi máy chủ ('+st+')')},
+ async auth(path,body){let r;try{r=await fetch(SB_URL+'/auth/v1/'+path,{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)})}catch(e){throw new Error('Không có mạng hoặc không kết nối được máy chủ.')}
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(this.errVi(j,r.status));return j},
+ mk(j){return{access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600),user:{id:j.user?.id,email:j.user?.email}}},
+ async register(u,p,remember){const email=this.toEmail(u);const j=await this.auth('signup',{email,password:p});if(!j.access_token)throw new Error('Đăng ký xong nhưng máy chủ yêu cầu xác nhận email.');this.setSess(this.mk(j),remember);await this.afterLogin()},
+ async login(u,p,remember){const email=this.toEmail(u);const j=await this.auth('token?grant_type=password',{email,password:p});this.setSess(this.mk(j),remember);await this.afterLogin()},
+ async afterLogin(){this.state='syncing';this.ui();await this.sync(true)},
+ async token(force){let s=this.sess();if(!s)return null;if(force||s.expires_at*1000-Date.now()<90000){try{const j=await this.auth('token?grant_type=refresh_token',{refresh_token:s.refresh_token});const rem=this.remembered();s=this.mk(j);this.setSess(s,rem)}catch(e){if(/mạng/.test(e.message))throw e;this.setSess(null);this.state='off';this.err='Phiên đăng nhập đã hết hạn – đăng nhập lại nhé.';this.ui();return null}}return s.access_token},
+ async api(path,opt={},retry=true){const t=await this.token();if(!t)throw new Error('Chưa đăng nhập');let r;
+  try{r=await fetch(SB_URL+path,{...opt,headers:{apikey:SB_KEY,Authorization:'Bearer '+t,'Content-Type':'application/json',...(opt.headers||{})}})}catch(e){const er=new Error('offline');er.offline=true;throw er}
+  if(r.status===401&&retry){await this.token(true);return this.api(path,opt,false)}
+  const tx=await r.text();let j=null;try{j=tx?JSON.parse(tx):null}catch(e){}if(!r.ok)throw new Error(this.errVi(j,r.status));return j},
+ builtin(id){return /^(ch|lb)_[a-z_]+$/.test(id)},
+ mark(kind,id,deleted){if(this.applying||!this.sess())return;if(kind==='secrets'&&!this.keysOn())return;const m=this.meta();if(!m.uid)return;const k=kind+'/'+id;m.ts=m.ts||{};m.dirty=m.dirty||{};m.ts[k]=Math.max(Date.now(),(m.ts[k]||0)+1);m.dirty[k]=deleted?2:1;this.saveMeta(m);this.schedule()},
+ schedule(ms=2000){clearTimeout(this.timer);this.timer=setTimeout(()=>this.sync(),ms)},
+ async localItem(kind,id){if(this.KINDS.includes(kind)){const a=await DB.all(kind);return a.find(x=>x.id===id)||null}
+  if(kind==='settings')return JSON.parse(JSON.stringify(S));
+  if(kind==='proxies'){const a=getProxies()||[];return this.keysOn()?a:a.map(p=>({...p,key:''}))}
+  if(kind==='secrets')return this.keysOn()?{apikey:getKey(),proxykey:getProxyKey(),proxyKeys:Object.fromEntries((getProxies()||[]).map(p=>[p.id,p.key||'']))}:null;return null},
+ async applyRemote(row){const{kind,id,data,deleted}=row;
+  if(this.KINDS.includes(kind)){if(deleted)await DB.del(kind,id);else if(data&&data.id===id)await DB.put(kind,data);return true}
+  if(kind==='settings'&&data&&!deleted){Object.assign(S,data);saveS();document.body.classList.toggle('lite',S.lite!==false);return true}
+  if(kind==='proxies'&&Array.isArray(data)){const loc=getProxies()||[];setProxies(data.map(p=>({...p,key:p.key||loc.find(x=>x.id===p.id)?.key||''})));applyActiveProxy();return true}
+  if(kind==='secrets'&&data&&this.keysOn()){if(data.apikey)localStorage.setItem('rp_apikey',data.apikey);if(data.proxykey)localStorage.setItem('rp_proxykey',data.proxykey);if(data.proxyKeys){const a=getProxies()||[];setProxies(a.map(p=>({...p,key:p.key||data.proxyKeys[p.id]||''})));applyActiveProxy()}return true}
+  return false},
+ async sync(first){if(!this.sess())return;if(this.busy){this.again=true;return}if(typeof busy!=='undefined'&&busy){this.schedule(3000);return}
+  if(!navigator.onLine){this.state='offline';this.ui();return}
+  this.busy=true;this.state='syncing';this.err='';this.ui();let changed=false;
+  try{const u=this.user();let m=this.meta();
+   if(m.uid!==u.id){/* first sync of this account on this device: merge local data into the account */
+    m={uid:u.id,cursor:null,ts:{},dirty:{}};
+    for(const k of this.KINDS)for(const x of await DB.all(k))m.ts[k+'/'+x.id]=this.builtin(x.id)?1:(x.updated||x.created||1);
+    m.ts['settings/main']=0;if(getProxies()?.length)m.ts['proxies/list']=0;if(this.keysOn())m.ts['secrets/keys']=0;m.merge=1;this.saveMeta(m)}
+   /* pull */
+   const seen={};let off=0;const since=m.cursor?new Date(new Date(m.cursor).getTime()-30000).toISOString():'1970-01-01T00:00:00Z';let maxAt=m.cursor;
+   while(true){const rows=await this.api(`/rest/v1/sync_items?select=kind,id,data,deleted,updated_at,server_at&server_at=gte.${encodeURIComponent(since)}&order=server_at.asc,kind.asc,id.asc&limit=40&offset=${off}`);
+    this.applying=true;try{for(const r of rows){const k=r.kind+'/'+r.id;seen[k]=r.updated_at;if(!maxAt||r.server_at>maxAt)maxAt=r.server_at;
+     if(r.updated_at>(m.ts[k]||0)){if(cur?.chat?.id===r.id&&typeof busy!=='undefined'&&busy)continue;if(await this.applyRemote(r)){m.ts[k]=r.updated_at;delete m.dirty[k];changed=true}}}}finally{this.applying=false}
+    if(rows.length<40)break;off+=rows.length}
+   m.cursor=maxAt;
+   if(m.merge){for(const k in m.ts)if(!(k in seen)||m.ts[k]>seen[k]){if(!m.ts[k])m.ts[k]=Date.now();m.dirty[k]=1}delete m.merge}
+   this.saveMeta(m);
+   /* push */
+   const keys=Object.keys(m.dirty||{});let batch=[],size=0;
+   const flush=async()=>{if(!batch.length)return;await this.api('/rest/v1/rpc/sync_push',{method:'POST',body:JSON.stringify({items:batch})});const mm=this.meta();for(const it of batch){const k=it.kind+'/'+it.id;if(mm.ts[k]===it.updated_at)delete mm.dirty[k]}this.saveMeta(mm);batch=[];size=0};
+   for(const k of keys){const i=k.indexOf('/'),kind=k.slice(0,i),id=k.slice(i+1);const del=m.dirty[k]===2;const data=del?null:await this.localItem(kind,id);
+    const it={kind,id,updated_at:m.ts[k]||Date.now(),deleted:del||data==null};if(!it.deleted)it.data=data;const sz=JSON.stringify(it).length;
+    if(sz>7e6){toast('Mục "'+(data?.name||data?.title||id)+'" quá lớn để đồng bộ (>7 MB) – bớt ảnh nhé.',5000);const mm=this.meta();delete mm.dirty[k];this.saveMeta(mm);continue}
+    if(size+sz>2.5e6||batch.length>=100)await flush();batch.push(it);size+=sz}
+   await flush();
+   const mm=this.meta();mm.at=Date.now();this.saveMeta(mm);this.state=Object.keys(mm.dirty||{}).length?'pending':'ok'}
+  catch(e){if(e.offline||!navigator.onLine){this.state='offline'}else if(!this.sess()){this.state='off'}else{this.state='error';this.err=e.message}}
+  finally{this.busy=false}
+  if(changed)await this.refreshViews();this.ui();if(this.again){this.again=false;this.schedule(500)}},
+ async refreshViews(){await loadAll();const v=document.querySelector('.view.on')?.id;
+  if(v==='v-home')renderHome();
+  else if(v==='v-chat'&&cur?.chat){const nc=CT.find(x=>x.id===cur.chat.id);if(!nc){go('home');renderHome()}else if(!busy&&nc!==cur.chat){cur.chat=nc;const c=members(nc)[0];if(c)cur.char=c;drawMsgs(false)}}},
+ async logout(wipeLocal){try{const t=this.sess()?.access_token;if(t)await fetch(SB_URL+'/auth/v1/logout',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+t}})}catch(e){}
+  this.setSess(null);localStorage.removeItem('rp_sync');this.state='off';
+  if(wipeLocal){await wipe();for(const k of['rp_settings','rp_apikey','rp_proxykey','rp_proxies','rp_proxy_active','rp_seeded','rp_seed_ver','rp_sync_keys'])localStorage.removeItem(k);location.reload();return}this.ui()},
+ async deleteAccount(){await this.api('/rest/v1/rpc/delete_my_account',{method:'POST',body:'{}'});this.setSess(null);localStorage.removeItem('rp_sync');this.state='off';this.ui()},
+ label(){const u=this.user();if(!u)return this.err||'Chưa đăng nhập – dữ liệu chỉ lưu trên máy này.';const at=this.meta().at;const t=at?new Date(at).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})+(new Date(at).toDateString()===new Date().toDateString()?'':' '+new Date(at).toLocaleDateString('vi-VN')):'';
+  return{syncing:'Đang đồng bộ…',ok:'Đã đồng bộ lúc '+t,pending:'Còn thay đổi chưa gửi – sẽ thử lại',offline:'Ngoại tuyến – sẽ đồng bộ khi có mạng',error:'Lỗi đồng bộ: '+this.err,off:'Đang chờ đồng bộ'}[this.state]||''},
+ ui(){const b=$('#h-acc');if(b){const u=this.user();b.dataset.st=u?this.state:'none';b.title=u?'Tài khoản: '+this.shown(u.email)+' · '+this.label():'Tài khoản (chưa đăng nhập)'}
+  const st=document.getElementById('acc-st');if(st)st.textContent=this.label();const ss=document.getElementById('s-accst');if(ss)ss.textContent=this.user()?this.shown(this.user().email)+' · '+this.label():this.label()},
+ init(){window.addEventListener('online',()=>this.sync());document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')this.sync()});window.addEventListener('focus',()=>{if(Date.now()-(this.meta().at||0)>15000)this.sync()});
+  setInterval(()=>{if(document.visibilityState==='visible'&&this.sess())this.sync()},60000);this.ui();if(this.sess())this.sync()}
+};
+{const _p=DB.put.bind(DB),_d=DB.del.bind(DB);DB.put=async(s,o)=>{await _p(s,o);SY.mark(s,o.id)};DB.del=async(s,id)=>{await _d(s,id);SY.mark(s,id,true)}}
+function showAccount(){const u=SY.user();
+ const m=modal(u?`<h3>{i:user} Tài khoản</h3><p>Đã đăng nhập: <b>${esc(SY.shown(u.email))}</b></p><p class="hint" id="acc-st">${esc(SY.label())}</p>
+  <div class="row"><button class="btn-p" id="acc-sync">{i:refresh} Đồng bộ ngay</button></div>
+  <label class="sw" style="color:var(--tx);margin-top:14px"><input type="checkbox" id="acc-keys" ${SY.keysOn()?'checked':''}> Cũng đồng bộ API key/proxy key</label><p class="hint">Cảnh báo: bật lên thì key được lưu trên máy chủ (chỉ tài khoản của bạn đọc được). Mặc định tắt – key chỉ ở máy này.</p>
+  <hr style="border:0;border-top:1px solid var(--line);margin:14px 0"><label class="sw" style="color:var(--tx)"><input type="checkbox" id="acc-wipe"> Xóa dữ liệu trên máy này khi đăng xuất</label><p class="hint">Không tick: đăng xuất vẫn giữ bản sao chat/nhân vật trên máy này.</p>
+  <div class="row" style="margin-top:8px"><button class="btn-g" id="acc-out">Đăng xuất</button><button class="btn-g" id="acc-x">Đóng</button></div>
+  <p style="margin-top:16px"><button class="btn-d" id="acc-del" style="font-size:12.5px;padding:6px 10px">Xóa tài khoản</button></p>`
+ :`<h3>{i:user} Tài khoản đồng bộ</h3><p class="hint">Đăng nhập để thấy chat, nhân vật, nhóm, lorebook, persona và cài đặt trên mọi máy. Không đăng nhập thì web vẫn dùng bình thường (chỉ lưu trên máy này).</p>
+  <div class="row" id="acc-tabs" style="margin:8px 0"><button class="btn-p" data-t="in">Đăng nhập</button><button class="btn-g" data-t="up">Đăng ký</button></div>
+  <label>Tên đăng nhập hoặc email</label><input id="acc-u" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="vd: hoang">
+  <label>Mật khẩu</label><div class="row" style="flex-wrap:nowrap"><input id="acc-p" type="password" autocomplete="current-password" placeholder="ít nhất 6 ký tự"><button class="btn-g" id="acc-eye" style="flex:none">{i:eye}</button></div>
+  <div id="acc-p2w" style="display:none"><label>Nhập lại mật khẩu</label><input id="acc-p2" type="password" autocomplete="new-password"></div>
+  <label class="sw" style="color:var(--tx);margin-top:12px"><input type="checkbox" id="acc-rem" checked> Ghi nhớ đăng nhập</label>
+  <p class="hint" id="acc-msg" style="min-height:1.2em;white-space:pre-wrap">${esc(SY.err||'')}</p>
+  <div class="row"><button class="btn-p" id="acc-go">Đăng nhập</button><button class="btn-g" id="acc-x">Đóng</button></div>
+  <p class="hint">Mật khẩu được mã hóa trên máy chủ. Dữ liệu chat trên máy này sẽ được gộp vào tài khoản (không mất gì). API key không được đồng bộ trừ khi bạn bật.</p>`);
+ const q=s=>m.querySelector(s);q('#acc-x').onclick=()=>m.remove();
+ if(u){q('#acc-sync').onclick=()=>SY.sync();q('#acc-keys').onchange=e=>{if(e.target.checked&&!confirm('Đồng bộ API key và proxy key lên máy chủ?\nKey sẽ được lưu kèm tài khoản (chỉ bạn đọc được). Chỉ bật nếu bạn tin tưởng.')){e.target.checked=false;return}localStorage.setItem('rp_sync_keys',e.target.checked?'1':'0');if(e.target.checked){SY.mark('secrets','keys');SY.mark('proxies','list')}};
+  q('#acc-out').onclick=async()=>{const w=q('#acc-wipe').checked;if(w&&!confirm('Xóa toàn bộ chat, nhân vật, cài đặt và key trên máy này rồi đăng xuất?'))return;await SY.sync();await SY.logout(w);m.remove();toast('Đã đăng xuất'+(w?'':' – dữ liệu vẫn còn trên máy này'))};
+  q('#acc-del').onclick=async()=>{if(!confirm('Xóa vĩnh viễn tài khoản và dữ liệu trên máy chủ? (Dữ liệu trên máy này vẫn giữ)'))return;try{await SY.deleteAccount();m.remove();toast('Đã xóa tài khoản')}catch(e){toast(e.message)}};return}
+ let mode='in';const setMode=t=>{mode=t;m.querySelectorAll('#acc-tabs button').forEach(b=>b.className=b.dataset.t===t?'btn-p':'btn-g');q('#acc-p2w').style.display=t==='up'?'':'none';q('#acc-go').textContent=t==='up'?'Tạo tài khoản':'Đăng nhập';q('#acc-p').autocomplete=t==='up'?'new-password':'current-password';q('#acc-msg').textContent=''};
+ m.querySelectorAll('#acc-tabs button').forEach(b=>b.onclick=()=>setMode(b.dataset.t));q('#acc-eye').onclick=()=>{const p=q('#acc-p');p.type=p.type==='password'?'text':'password'};
+ const go_=async()=>{const un=q('#acc-u').value.trim(),pw=q('#acc-p').value,msg=q('#acc-msg');if(!un||!pw){msg.textContent='Nhập tên đăng nhập và mật khẩu.';return}
+  if(mode==='up'){if(pw.length<6){msg.textContent='Mật khẩu ít nhất 6 ký tự.';return}if(pw!==q('#acc-p2').value){msg.textContent='Hai mật khẩu không khớp.';return}}
+  const b=q('#acc-go');b.disabled=true;msg.textContent=mode==='up'?'Đang tạo tài khoản…':'Đang đăng nhập…';
+  try{SY.err='';await(mode==='up'?SY.register(un,pw,q('#acc-rem').checked):SY.login(un,pw,q('#acc-rem').checked));m.remove();toast(SY.state==='error'?'Đã đăng nhập nhưng '+SY.label():'Đã đăng nhập – '+SY.label(),3500);showAccount()}
+  catch(e){msg.textContent=e.message;b.disabled=false}};
+ q('#acc-go').onclick=go_;q('#acc-p').onkeydown=e=>{if(e.key==='Enter')go_()};setTimeout(()=>q('#acc-u').focus(),60)}
+
 /* ---------- SEED / INIT ---------- */
 const SEED_VER=3;
 const loreHash=l=>hashStr((l.entries||[]).map(e=>[e.comment||'',(e.keys||[]).join(','),e.content||'',e.enabled===false?'0':'1'].join('\u0001')).join('\u0002'));
@@ -1184,6 +1302,6 @@ async function seed(manual){const P=await getSeed();if(!P)return;if(manual&&!con
  else{await updateBuiltinLore(P);const haveL=new Set(LB.map(l=>l.id)),haveC=new Set(CH.map(c=>c.id));for(const l of P.lorebooks)if(!haveL.has(l.id))await saveLore(l);for(const c of P.chars)if(!haveC.has(c.id))await saveChar(c)}
  localStorage.setItem('rp_seeded','1');localStorage.setItem('rp_seed_ver',String(SEED_VER));await loadAll();if(manual){toast('Đã nhập dữ liệu mẫu');renderHome()}}
 (async()=>{if(migrateProxy())toast('Đã chuyển proxy cũ thành cấu hình “Proxy 1”',3000);applyActiveProxy();await DB.open();await loadAll();document.body.classList.toggle('lite',S.lite!==false);if((window.PRELOAD||window.SEED_URL)&&(!localStorage.getItem('rp_seeded')||Number(localStorage.getItem('rp_seed_ver')||0)<SEED_VER))await seed(false);if(await migrateGroups())await loadAll();renderHome();
- if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600)})();
-window.RP={editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
+ if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);SY.init()})();
+window.RP={SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
 </script></body></html>
