@@ -330,7 +330,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=f76fa85f10';
+window.SEED_URL='seed.json?v=ee277602e9';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -685,9 +685,15 @@ const STREAM=()=>S.stream!==false;
 const reqHasImg=req=>{const cs=req.body?.contents||[];for(let i=cs.length-1;i>=0;i--)if(cs[i].role==='user')return(cs[i].parts||[]).some(p=>p.inlineData);return false};
 function imgDirect(){if(S.imgDirect===false)return null;const pk=getProxyKey().trim(),gk=getKey().trim();const key=/^AIza[\w-]{20,}$/.test(pk)?pk:gk;if(!key)return null;const pm=(S.proxyModel||'').trim();return{key,model:/^gemini-/i.test(pm)?pm:S.model.trim()}}
 let imgNoted=0;
+/* proxies like the Colab one wrap replies in <think>…</think> <response>…</response>; never show or store those tags */
+function cleanReply(t,partial){if(t==null)return t;let s=String(t).replace(/<think>[\s\S]*?<\/think>/gi,'');
+ const ot=s.search(/<think>/i);if(ot>=0){const rs=s.slice(ot).search(/<response>/i);if(rs>=0)s=s.slice(0,ot)+s.slice(ot+rs);else if(partial)s=s.slice(0,ot)}
+ s=s.replace(/<\/?(think|response)>/gi,'');if(partial)s=s.replace(/<\/?[a-z]{1,8}$/i,'');return s.replace(/^\s+/,'')}
 async function aiStream(req,onText){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
  if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/(^|\D)404(\D|$)|not found/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
- if(STREAM())return fn(onText);const r=await fn(()=>{});if(r.text)onText(r.text);return r}
+ const fin=r=>{if(r&&typeof r.text==='string'){r.raw=r.text;r.text=cleanReply(r.text).replace(/\s+$/,'')}return r};
+ if(STREAM()){const r=fin(await fn(t=>onText(cleanReply(t,true))));if(r&&typeof r.text==='string')onText(r.text);return r}
+ const r=fin(await fn(()=>{}));if(r.text)onText(r.text);return r}
 
 /* ---------- GEMINI STREAM ---------- */
 let abortCtl=null;
@@ -968,7 +974,8 @@ function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');c
   return`<div class="m ${u?'u':''} ${i===n-1?'last':''}" data-i="${i}"><div class="av ${u&&per?.avatar?'pav':''}" style="${u?(per?.avatar?`--pav:url('${per.avatar}')`:''):`background-image:url('${nar?(gAv(gg)||c.avatar):c.avatar}')${nar?';border-radius:12px':''}`}"></div><div class="bub"><div class="who">${esc(u?per?.name||'User':nar?(gg?.name||'Mở đầu')+' · mở đầu':c.name)}</div>
   ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${render(shown(m,c,ch))}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
   ${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
-  <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button><button data-a="cont" title="Tiếp tục">{i:forward}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(errText?`<div class="errbox">${esc(errText)}</div>`:'')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
+  <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button><button data-a="cont" title="Tiếp tục">{i:forward}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(errText?`<div class="errbox">${esc(errText)}<div class="row" style="margin-top:8px"><button class="btn-g" id="c-retry" type="button">{i:refresh} Tạo lại</button></div></div>`:'')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
+ const rb=B.querySelector('#c-retry');if(rb)rb.onclick=()=>{if(busy)return;rb.closest('.errbox')?.remove();const L=ch.messages[ch.messages.length-1];L&&L.role==='model'&&!L.narrator&&!L.greeting?generate('swipe'):generate('new')};
  const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),f=B.querySelector('.m'),id=f?.dataset.i,y0=f?f.getBoundingClientRect().top:0;stick=false;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);const fix=()=>{const e=id!=null&&B.querySelector(`.m[data-i="${id}"]`);if(e)sc.scrollTop+=e.getBoundingClientRect().top-y0};fix();requestAnimationFrame(()=>{fix();setTimeout(fix,250)})};
  B.querySelectorAll('.bub img').forEach(im=>im.onclick=()=>{const v=$('#imgview');v.querySelector('img').src=im.src;v.style.display='flex';const done=NAV.overlay(()=>{v.style.display='none'});v.onclick=()=>{v.style.display='none';done&&done()}});
  B.querySelectorAll('[data-a]').forEach(b=>b.onclick=ev=>msgAction(+b.closest('.m').dataset.i,b.dataset.a,ev.currentTarget));
@@ -1019,7 +1026,7 @@ async function generate(mode,errNote,speakerId){const{char:c0,chat:ch}=cur;if(bu
  try{const req=buildRequest(c,ch,history,extra);let lastDraw=0,raf=0;
   const put=t=>{if(isGroup(ch)&&mode!=='cont')t=t.replace(new RegExp('^\\s*'+reEsc(c.name)+'\\s*:\\s*'),'');target.swipes[target.sw]=base+(mode==='cont'&&base&&t&&!/^\s/.test(t)?' ':'')+t};
   const r=await aiStream(req,t=>{const k=cutStop(t,req.stops);if(k!=null){t=k;if(!hit){hit=true;abortCtl?.abort()}}put(t);if(!raf&&performance.now()-lastDraw>100)raf=requestAnimationFrame(()=>{raf=0;lastDraw=performance.now();const el=document.querySelector('.m.last .tx');if(el){el.innerHTML=render(shown(target,c,ch));scrollDown()}})});if(raf){cancelAnimationFrame(raf);raf=0}
-  target.note=finishNote(r);if(!r.text&&mode!=='cont'){err=target.note;target.note=''}}
+  target.note=finishNote(r);if(!(r.text||'').trim()&&mode!=='cont'){err=(r.raw&&r.raw.trim())||!target.note?'{i:close} Model trả về trống (chỉ có thẻ, không có lời thoại), bấm Tạo lại.':target.note;target.note=''}}
  catch(e){if(e.name==='AbortError'){target.note=hit?'':'{i:stop} Đã dừng.'}else err='{i:close} '+e.message}
  busy=false;target.streaming=false;abortCtl=null;target.swipes[target.sw]=applyRegex(msgText(target).replace(/\s+$/,''),'ai','edit');
  if(err&&!msgText(target)){if(mode==='swipe'){target.swipes.pop();target.sw=Math.max(0,target.swipes.length-1)}else if(mode==='new')ch.messages.pop()}
@@ -1351,5 +1358,5 @@ async function seed(manual){const P=await getSeed();if(!P)return;if(manual&&!con
  localStorage.setItem('rp_seeded','1');localStorage.setItem('rp_seed_ver',String(SEED_VER));await loadAll();if(manual){toast('Đã nhập dữ liệu mẫu');renderHome()}}
 (async()=>{if(migrateProxy())toast('Đã chuyển proxy cũ thành cấu hình “Proxy 1”',3000);applyActiveProxy();await DB.open();await loadAll();document.body.classList.toggle('lite',S.lite!==false);if((window.PRELOAD||window.SEED_URL)&&(!localStorage.getItem('rp_seeded')||Number(localStorage.getItem('rp_seed_ver')||0)<SEED_VER))await seed(false);if(await migrateGroups())await loadAll();renderHome();
  if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);NAV.init();SY.init()})();
-window.RP={NAV,SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
+window.RP={NAV,cleanReply,SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
 </script></body></html>
