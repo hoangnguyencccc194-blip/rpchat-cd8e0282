@@ -236,6 +236,13 @@ input[type=range]{accent-color:#cfd0d4}
 .typing{display:inline-flex;align-items:center;gap:3px;color:#9a9ba0;font-style:italic;font-size:14px}.typing i{width:5px;height:5px;border-radius:50%;background:#9a9ba0;display:inline-block;animation:tdot 1.2s infinite ease-in-out!important}.typing i:nth-child(2){animation-delay:.2s!important}.typing i:nth-child(3){animation-delay:.4s!important}
 .tx.nost.cursor:after{content:none}
 @keyframes tdot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+.modesw{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.modesw button{padding:12px 8px;border-radius:12px;border:1px solid var(--line2);background:var(--card2);color:var(--tx);font-weight:650;font-size:14px;min-height:56px;line-height:1.3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.modesw button small{font-weight:400;color:var(--mut);font-size:12px}
+.modesw button.on{background:var(--acc);color:#1d1e22;border-color:var(--acc)}
+.modesw button.on small{color:#3a3b40}
+#c-mode{font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:var(--card2);color:var(--tx);flex:none;white-space:nowrap;margin-right:2px}
+#c-mode.px{background:var(--acc);color:#1d1e22;border-color:var(--acc)}
 </style></head><body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.5V20a.5.5 0 0 0 .5.5h3.5V15a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v5.5H18a.5.5 0 0 0 .5-.5V9.5"/></symbol>
@@ -294,7 +301,7 @@ input[type=range]{accent-color:#cfd0d4}
 
 <!-- CHAT -->
 <section class="view" id="v-chat">
- <header><button class="icon" id="c-back">{i:back}</button><div class="av" id="c-av"></div><h1 id="c-title"></h1><button class="icon" id="c-more">{i:more}</button></header>
+ <header><button class="icon" id="c-back">{i:back}</button><div class="av" id="c-av"></div><h1 id="c-title"></h1><button id="c-mode" type="button" title="Chế độ kết nối – bấm để đổi">API</button><button class="icon" id="c-more">{i:more}</button></header>
  <div class="scroll" id="c-scroll"><div id="msgs"></div><button id="c-newmsg" type="button">↓ Tin mới</button></div>
  <div class="composer">
   <div class="qbar" id="c-gbar"></div><div class="qbar" id="c-qbar"></div><div class="prev" id="c-prev"></div>
@@ -330,7 +337,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=ee277602e9';
+window.SEED_URL='seed.json?v=85e5aad720';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -689,6 +696,13 @@ let imgNoted=0;
 function cleanReply(t,partial){if(t==null)return t;let s=String(t).replace(/<think>[\s\S]*?<\/think>/gi,'');
  const ot=s.search(/<think>/i);if(ot>=0){const rs=s.slice(ot).search(/<response>/i);if(rs>=0)s=s.slice(0,ot)+s.slice(ot+rs);else if(partial)s=s.slice(0,ot)}
  s=s.replace(/<\/?(think|response)>/gi,'');if(partial)s=s.replace(/<\/?[a-z]{1,8}$/i,'');return s.replace(/^\s+/,'')}
+/* ---------- CONNECTION MODE: 'gemini' = API key straight to Gemini, 'proxy' = the active proxy config ---------- */
+function modeInfo(){const px=S.source==='proxy';if(px){const p=activeProxy();let host='';try{host=new URL(p?.url||'').host}catch(e){}
+  return{px,label:'Proxy',detail:(p?.name||'chưa có proxy')+(host?' · '+host:'')+(S.proxyModel?' · '+S.proxyModel:''),warn:!p||!p.url?'Chưa có proxy – bấm “Thêm proxy” ở mục Proxy bên dưới.':''}}
+ return{px,label:'API key',detail:'Gemini trực tiếp · '+(S.model||''),warn:getKey()?'':'Chưa có API key – dán key (AIza…) ở mục Gemini API bên dưới.'}}
+function updMode(){const i=modeInfo();const c=$('#c-mode');if(c){c.textContent=i.px?'Proxy':'API';c.title='Đang dùng '+i.label+' ('+i.detail+') – bấm để đổi';c.classList.toggle('px',i.px)}
+ const box=$('#s-mode');if(box){box.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('on',(b.dataset.mode==='proxy')===i.px));const h=box.querySelector('#s-source');if(h)h.value=i.px?'proxy':'gemini';const d=box.querySelector('.mdet');if(d)d.innerHTML='Đang dùng: <b>'+esc(i.label)+'</b> – '+esc(i.detail)+(i.warn?'<br><span style="color:#f0b86e">'+esc(i.warn)+'</span>':'')}}
+function setMode(m,quiet){S.source=m==='proxy'?'proxy':'gemini';saveS();updMode();if(!quiet){const i=modeInfo();toast((i.px?'Đang chat qua Proxy: ':'Đang chat bằng API key: ')+i.detail+(i.warn?'\n'+i.warn:''),3500)}}
 async function aiStream(req,onText){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
  if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/(^|\D)404(\D|$)|not found/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
  const fin=r=>{if(r&&typeof r.text==='string'){r.raw=r.text;r.text=cleanReply(r.text).replace(/\s+$/,'')}return r};
@@ -745,7 +759,7 @@ var NAV={stack:[],ov:{},silent:0,q:[],qt:0,popping:false,editId:null,loreId:null
  apply(e){const v=e.v,n=this.n(),ce=this.stack[n]||this.st();
   if(v==='home'){this.closeAbove(n);if(n>0)this.back(n);else this.replace(e);return}
   if(this.same(ce,e)){this.replace(e);return}
-  if(n>0&&this.same(this.stack[n-1],e)){this.back(1);return}
+  if(n>0&&e.v==='detail'&&this.same(this.stack[n-1],e)){this.back(1);return}/* returning to the parent page after save/delete; other screens always push so Back retraces them */
   this.push(e)},
  appBack(fb){if(this.n()>0)history.back();else fb&&fb()},
  overlay(close){if(this.popping)return null;const r={n:null,x:0};this.run(()=>{if(r.x)return;this.push({o:1});r.n=this.n();this.ov[r.n]=close});return()=>{r.x=1;const n=r.n;if(n!=null&&this.ov[n]===close){delete this.ov[n];this.run(()=>{if(this.n()===n)this.back(1)})}}},
@@ -905,7 +919,7 @@ async function migrateGroups(){let n=0;try{for(const ch of CT){if(ch.groupId||(c
  ch.groupId=g.id;await DB.put('chats',ch);n++}}catch(e){console.warn('migrateGroups',e)}return n}
 let pending=[],busy=false;
 function applyBg(){const ch=cur.chat;const sc=$('#c-scroll');const img=ch?.bg||S.bgImage;if(img){const d=(+S.bgDim||0)/100;sc.classList.add('bg');sc.style.setProperty('--cbg',`linear-gradient(rgba(12,10,20,${d}),rgba(12,10,20,${d})),url('${img}')`)}else{sc.classList.remove('bg');sc.style.removeProperty('--cbg')}}
-function openChat(id){const ch=CT.find(x=>x.id===id);const ms=members(ch);const c=ms[0];if(!ch||!c)return toast('Không tìm thấy chat');const g=gOf(ch);cur={char:c,chat:ch,group:g};go('chat');
+function openChat(id){const ch=CT.find(x=>x.id===id);const ms=members(ch);const c=ms[0];if(!ch||!c)return toast('Không tìm thấy chat');const g=gOf(ch);cur={char:c,chat:ch,group:g};go('chat');updMode();
  $('#c-title').textContent=isGroup(ch)?(g?.name||ch.title):c.name;$('#c-av').style.backgroundImage=`url('${isGroup(ch)&&gAv(g)||c.avatar}')`;$('#c-av').style.borderRadius=isGroup(ch)?'12px':'';pending=[];applyBg();drawPrev();drawBars();drawMsgs(true)}
 $('#c-back').onclick=()=>NAV.appBack(()=>{const g=gOf(cur.chat);g?openGroup(g.id):openDetail(cur.char.id)});
 $('#c-more').onclick=e=>{const{char:c,chat:ch}=cur;menu(e.currentTarget,[['{i:chat} Chat mới',()=>isGroup(ch)?newGroupChat(gOf(ch)||ch.members):newChat(c)],!isGroup(ch)&&['{i:wave} Đổi lời chào',()=>changeGreeting()],
@@ -1115,7 +1129,7 @@ function wireProxyList(){const L=$('#px-list');if(!L)return;const redraw=()=>{L.
  L.querySelectorAll('[data-px]').forEach(e=>e.onclick=ev=>{const t=ev.target.closest('button');const id=e.dataset.px;const a=getProxies()||[];const p=a.find(x=>x.id===id);if(!p)return;
   if(t?.dataset.pxe)return editProxy(p,redraw);
   if(t?.dataset.pxd)return confirmDo('Xóa proxy "'+(p.name||'')+'"?',()=>{const b=a.filter(x=>x.id!==id);setProxies(b);if(activeProxyId()===id){if(b[0])localStorage.setItem('rp_proxy_active',b[0].id);else{localStorage.removeItem('rp_proxy_active');localStorage.removeItem('rp_proxykey');S.proxyUrl='';S.proxyModel='';saveS()}}applyActiveProxy();redraw()});
-  localStorage.setItem('rp_proxy_active',id);applyActiveProxy();S.source='proxy';saveS();const sel=$('#s-source');if(sel)sel.value='proxy';toast('Đang dùng proxy: '+(p.name||''));redraw()});
+  localStorage.setItem('rp_proxy_active',id);applyActiveProxy();S.source='proxy';saveS();const sel=$('#s-source');if(sel)sel.value='proxy';updMode();toast('Đang dùng proxy: '+(p.name||''));redraw()});
  const ad=$('#px-add');if(ad)ad.onclick=()=>editProxy(null,redraw)}
 function editProxy(p0,done){const isNew=!p0;const n=(getProxies()||[]).length;const p=p0?{...p0}:{id:'px_'+uid(),name:'Proxy '+(n+1),url:'',key:'',model:''};
  const m=modal(`<h3>{i:globe} Editing: <span id="px-t">${esc(p.name)}</span></h3>
@@ -1145,14 +1159,15 @@ function editProxy(p0,done){const isNew=!p0;const n=(getProxies()||[]).length;co
  Q('#px-x').onclick=()=>m.remove();
  const d=Q('#px-del');if(d)d.onclick=()=>confirmDo('Xóa proxy "'+p.name+'"?',()=>{const b=(getProxies()||[]).filter(x=>x.id!==p.id);setProxies(b);if(activeProxyId()===p.id){b[0]?localStorage.setItem('rp_proxy_active',b[0].id):localStorage.removeItem('rp_proxy_active')}applyActiveProxy();m.remove();done&&done()});
  Q('#px-ok').onclick=()=>{p.name=Q('#px-n').value.trim()||'Proxy';p.url=Q('#px-u').value.trim();p.key=Q('#px-k').value.trim();p.model=Q('#px-m').value.trim();
-  const a=getProxies()||[];const i=a.findIndex(x=>x.id===p.id);i>=0?a[i]=p:a.push(p);setProxies(a);localStorage.setItem('rp_proxy_active',p.id);applyActiveProxy();S.source='proxy';saveS();const sel=$('#s-source');if(sel)sel.value='proxy';m.remove();toast('Đã lưu & đang dùng: '+p.name);done&&done()}})}
+  const a=getProxies()||[];const i=a.findIndex(x=>x.id===p.id);i>=0?a[i]=p:a.push(p);setProxies(a);localStorage.setItem('rp_proxy_active',p.id);applyActiveProxy();S.source='proxy';saveS();const sel=$('#s-source');if(sel)sel.value='proxy';updMode();m.remove();toast('Đã lưu & đang dùng: '+p.name);done&&done()}})}
 function renderSettings(){const B=$('#s-body');B.innerHTML=`<div class="sec" style="display:flex;align-items:center;gap:10px">${icon('user')}<div style="flex:1;min-width:0"><b>Tài khoản</b><div class="hint" id="s-accst" style="margin:2px 0 0">${esc(SY.user()?SY.shown(SY.user().email)+' · '+SY.label():'Chưa đăng nhập – chỉ lưu trên máy này')}</div></div><button class="btn-g" id="s-acc">${SY.user()?'Quản lý':'Đăng nhập'}</button></div>`+
+ `<div class="sec" id="s-mode"><b>Chế độ kết nối</b><div class="modesw"><button type="button" data-mode="gemini">{i:key} API key<small>trực tiếp Gemini</small></button><button type="button" data-mode="proxy">{i:globe} Proxy<small>Colab / OpenAI</small></button></div><div class="hint mdet" style="margin:8px 0 0"></div><input type="hidden" id="s-source" value="${S.source==='proxy'?'proxy':'gemini'}"></div>`+
  sec('sec-api','{i:key} Gemini API',`<label>API key (chỉ lưu trong trình duyệt này – localStorage)</label><div class="row" style="flex-wrap:nowrap"><input id="s-key" type="password" autocomplete="off" value="${esc(getKey())}" placeholder="AIza…"><button class="btn-g" id="s-eye">{i:eye}</button></div>
  <label>Model</label><input id="s-model" list="models" value="${esc(S.model)}"><datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"><option value="gemini-2.5-flash-lite"></datalist>
  <div class="g3">${num('temperature','Temperature',S.temperature,'step="0.05" min="0" max="2"')}${num('maxTokens','Token trả lời',S.maxTokens)}${num('topP','Top P',S.topP,'step="0.01" min="0" max="1"')}</div>
  ${sw('s-autoSum',S.autoSum,`{i:brain} Tự động tóm tắt khi chat dài (mỗi ${S.sumEvery} tin cũ, giữ nguyên ${S.sumKeep} tin gần nhất)`)}
  ${sw('s-civic',S.civic,'Gửi cả CIVIC_INTEGRITY=BLOCK_NONE (tự bỏ nếu model báo lỗi)')}`)+
- sec('sec-proxy','{i:globe} Proxy',`<label>Nguồn AI</label><select id="s-source"><option value="gemini" ${S.source!=='proxy'?'selected':''}>Gemini API</option><option value="proxy" ${S.source==='proxy'?'selected':''}>Proxy (OpenAI-tương thích)</option></select>
+ sec('sec-proxy','{i:globe} Proxy',`<p class="hint" style="margin-top:0">Chọn chat bằng API key hay Proxy ở mục <b>Chế độ kết nối</b> trên cùng. Lưu/chọn một proxy ở đây sẽ chuyển sang chế độ Proxy.</p>
  <label style="margin-top:14px">Cấu hình proxy đã lưu</label><div id="px-list">${proxyListHtml()}</div>
  <button class="btn-g" id="px-add" style="width:100%;margin-top:4px">{i:plus} Thêm proxy</button>
  <p class="mut" style="margin-top:8px">Chạm vào một proxy để dùng nó. Key chỉ lưu trong trình duyệt này, không nằm trong file sao lưu. Sampler, system prompt và lore áp dụng cho cả hai nguồn.</p>`)+
@@ -1187,7 +1202,7 @@ Trong tin bạn gửi, macro (vd xúc xắc) được tính ngay lúc gửi.</p>
  <label>Độ tối lớp phủ ảnh nền: <b id="s-bgdv">${S.bgDim}%</b></label><input type="range" id="s-bgDim" min="0" max="95" value="${S.bgDim}">`)+
  sec('sec-data','{i:save} Dữ liệu',`<p class="mut">Lưu trữ: ${DB.mem?'localStorage (dự phòng)':'IndexedDB'} · ${CH.length} nhân vật · ${LB.length} lorebook · ${CT.length} chat · ${GR.length} nhóm</p><div class="row"><button class="btn-g" id="s-exp">{i:download} Sao lưu tất cả (JSON)</button><button class="btn-g" id="s-imp">{i:upload} Khôi phục từ file</button><button class="btn-d" id="s-wipe">Xóa toàn bộ</button></div><p class="mut">File sao lưu gồm nhân vật, lorebook, chat (kèm ảnh), persona, regex, cài đặt – KHÔNG gồm API key hay Proxy key.</p>`);
  $('#s-acc').onclick=()=>showAccount();B.querySelectorAll('details.sec').forEach(d=>d.ontoggle=()=>d.open?openSecs.add(d.id):openSecs.delete(d.id));
- $('#s-eye').onclick=()=>{const k=$('#s-key');k.type=k.type==='password'?'text':'password'};wireProxyList();$('#s-source').onchange=e=>{S.source=e.target.value;saveS();toast(S.source==='proxy'?'Đang dùng Proxy: '+(activeProxy()?.name||'(chưa có)'):'Đang dùng Gemini API')};
+ $('#s-eye').onclick=()=>{const k=$('#s-key');k.type=k.type==='password'?'text':'password'};wireProxyList();B.querySelectorAll('#s-mode [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));updMode();
  $('#s-reset').onclick=()=>{$('#s-sysPrompt').value=DEFAULT_SYS};
  const rer=()=>{collectS();saveS();renderSettings()};
  B.querySelectorAll('[data-pid]').forEach(e=>e.onclick=ev=>{if(ev.target.closest('[data-pe]'))return;collectS();S.defPersona=e.dataset.pid;saveS();renderSettings()});
@@ -1357,6 +1372,6 @@ async function seed(manual){const P=await getSeed();if(!P)return;if(manual&&!con
  else{await updateBuiltinLore(P);const haveL=new Set(LB.map(l=>l.id)),haveC=new Set(CH.map(c=>c.id));for(const l of P.lorebooks)if(!haveL.has(l.id))await saveLore(l);for(const c of P.chars)if(!haveC.has(c.id))await saveChar(c)}
  localStorage.setItem('rp_seeded','1');localStorage.setItem('rp_seed_ver',String(SEED_VER));await loadAll();if(manual){toast('Đã nhập dữ liệu mẫu');renderHome()}}
 (async()=>{if(migrateProxy())toast('Đã chuyển proxy cũ thành cấu hình “Proxy 1”',3000);applyActiveProxy();await DB.open();await loadAll();document.body.classList.toggle('lite',S.lite!==false);if((window.PRELOAD||window.SEED_URL)&&(!localStorage.getItem('rp_seeded')||Number(localStorage.getItem('rp_seed_ver')||0)<SEED_VER))await seed(false);if(await migrateGroups())await loadAll();renderHome();
- if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);NAV.init();SY.init()})();
-window.RP={NAV,cleanReply,SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
+ if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);NAV.init();SY.init();updMode();$('#c-mode').onclick=()=>setMode(S.source==='proxy'?'gemini':'proxy')})();
+window.RP={NAV,setMode,modeInfo,updMode,cleanReply,SY,showAccount,editChar,editPersona,imgUrlIn,clipFiles,getPastedImage,addImageSrc,getProxies,activeProxy,applyActiveProxy,migrateProxy,addChatCompletions,modelsUrl,editProxy,loreHash,updateBuiltinLore,editGroup,openGroup,planSpeakers,mentioned,runQueue,groupTurn,migrateGroups,exportGroup,importGroup,collage,showGroup,toggleMute,pickReplacer,get GR(){return GR},saveGroup,newGroupChat,showAN,openLore,macros,applyRegex,members,pickSpeaker,chatJsonl,parseJsonl,cardPng,cardData,crc32,impersonate,generate,branchAt,cutStop,stopList,get S(){return S},saveS,renderSettings,collectS,drawMsgs,get cur(){return cur},activateLore,keyMatch,parseLorebook,cardToChar,pngChara,buildContents,buildRequest,buildSystem,geminiStream,proxyStream,toOpenAI,normProxyUrl,aiStream,summarize,sumCut,DB,get CH(){return CH},get LB(){return LB},get CT(){return CT},loadAll,openChat,newChat,send,addImages,saveChar,saveLore,get pending(){return pending}};
 </script></body></html>
