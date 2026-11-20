@@ -2,7 +2,15 @@
   "1": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "WAI-Nsfw-Illustrious-15.safetensors"
+      "ckpt_name": "NTRMIX XIII2.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 832,
+      "height": 1216,
+      "batch_size": 1
     }
   },
   "10": {
@@ -21,18 +29,10 @@
       "strength_clip": 0.85
     }
   },
-  "5": {
-    "class_type": "EmptyLatentImage",
-    "inputs": {
-      "width": 832,
-      "height": 1216,
-      "batch_size": 1
-    }
-  },
   "6": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "masterpiece, best quality, amazing quality, official art, traditional media, watercolor (medium), bleach_watercolor, 1girl, solo, inoue orihime, bleach, long hair, orange hair, brown eyes, parted bangs, hair ornament, hair flower, blue flower, green shirt, frilled shirt, short sleeves, blue jeans, white background, simple background, cowboy shot",
+      "text": "masterpiece, best quality, amazing quality, official art, traditional media, colored pencil (medium), watercolor (medium), sketch lines, (artist:kubo tite), source manga, bleach_watercolor, 1girl, solo, inoue orihime, bleach, long hair, orange hair, brown eyes, parted bangs, hair ornament, hair flower, blue flower, green shirt, frilled shirt, short sleeves, blue jeans, white background, simple background, cowboy shot",
       "clip": [
         "10",
         1
@@ -53,8 +53,8 @@
     "class_type": "KSampler",
     "inputs": {
       "seed": 0,
-      "steps": 28,
-      "cfg": 6.0,
+      "steps": 30,
+      "cfg": 5.0,
       "sampler_name": "euler_ancestral",
       "scheduler": "normal",
       "denoise": 1.0,
