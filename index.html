@@ -337,7 +337,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=a3abbbaf7e';
+window.SEED_URL='seed.json?v=c10d1c965c';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1359,17 +1359,21 @@ function showAccount(){const u=SY.user();
  q('#acc-go').onclick=go_;q('#acc-p').onkeydown=e=>{if(e.key==='Enter')go_()};setTimeout(()=>q('#acc-u').focus(),60)}
 
 /* ---------- SEED / INIT ---------- */
-const SEED_VER=4;
+const SEED_VER=5;
 const loreHash=l=>hashStr((l.entries||[]).map(e=>[e.comment||'',(e.keys||[]).join(','),e.content||'',e.enabled===false?'0':'1'].join('\u0001')).join('\u0002'));
 /* update built-in lorebooks the user already has: replace if unedited (matches an earlier built-in version), else only add entries they don't have */
 async function updateBuiltinLore(P){for(const l of P.lorebooks){const cur=LB.find(x=>x.id===l.id);if(!cur||!Array.isArray(l.prevHashes))continue;const h=loreHash(cur);if(h===loreHash(l))continue;
  if(l.prevHashes.includes(h)){cur.entries=structuredClone(l.entries);await saveLore(cur);continue}
  const have=new Set(cur.entries.map(e=>(e.comment||'').trim().toLowerCase())),uids=new Set(cur.entries.map(e=>String(e.uid)));const add=l.entries.filter(e=>!have.has((e.comment||'').trim().toLowerCase())).map(e=>{const n=structuredClone(e);if(uids.has(String(n.uid)))n.uid=uid();uids.add(String(n.uid));return n});
  if(add.length){cur.entries.push(...add);await saveLore(cur)}}}
+/* update built-in characters the user already has, only if unedited (text matches an earlier built-in version) */
+const charHash=c=>hashStr(JSON.stringify([c.name,c.bio,c.description,c.personality,c.scenario,c.mes_example,c.greetings,c.tags,c.sysOverride||'',c.phi||'']));
+async function updateBuiltinChars(P){for(const c of P.chars){const cur=CH.find(x=>x.id===c.id);if(!cur||!Array.isArray(c.prevHashes))continue;const h=charHash(cur);if(h===charHash(c)||!c.prevHashes.includes(h))continue;
+ for(const k of['name','bio','description','personality','scenario','mes_example','greetings','tags'])cur[k]=structuredClone(c[k]);for(const k of['sysOverride','phi'])if(c[k]==null)delete cur[k];else cur[k]=c[k];await saveChar(cur)}}
 async function getSeed(){if(window.PRELOAD)return window.PRELOAD;if(!window.SEED_URL)return null;try{const r=await fetch(window.SEED_URL);if(!r.ok)throw new Error('HTTP '+r.status);window.PRELOAD=await r.json()}catch(e){toast('Không tải được dữ liệu mẫu: '+e.message,4000)}return window.PRELOAD||null}
 async function seed(manual){const P=await getSeed();if(!P)return;if(manual&&!confirm('Nhập nhân vật & lorebook mẫu? (dữ liệu trùng sẽ được ghi đè)'))return;
  if(manual){for(const l of P.lorebooks)await saveLore(l);for(const c of P.chars)await saveChar(c)}
- else{await updateBuiltinLore(P);const haveL=new Set(LB.map(l=>l.id)),haveC=new Set(CH.map(c=>c.id));for(const l of P.lorebooks)if(!haveL.has(l.id))await saveLore(l);for(const c of P.chars)if(!haveC.has(c.id))await saveChar(c)}
+ else{await updateBuiltinLore(P);await updateBuiltinChars(P);const haveL=new Set(LB.map(l=>l.id)),haveC=new Set(CH.map(c=>c.id));for(const l of P.lorebooks)if(!haveL.has(l.id))await saveLore(l);for(const c of P.chars)if(!haveC.has(c.id))await saveChar(c)}
  localStorage.setItem('rp_seeded','1');localStorage.setItem('rp_seed_ver',String(SEED_VER));await loadAll();if(manual){toast('Đã nhập dữ liệu mẫu');renderHome()}}
 (async()=>{if(migrateProxy())toast('Đã chuyển proxy cũ thành cấu hình “Proxy 1”',3000);applyActiveProxy();await DB.open();await loadAll();document.body.classList.toggle('lite',S.lite!==false);if((window.PRELOAD||window.SEED_URL)&&(!localStorage.getItem('rp_seeded')||Number(localStorage.getItem('rp_seed_ver')||0)<SEED_VER))await seed(false);if(await migrateGroups())await loadAll();renderHome();
  if(!getKey())setTimeout(()=>toast('Vào {i:gear} Cài đặt để dán Gemini API key của bạn',4000),600);NAV.init();SY.init();updMode();$('#c-mode').onclick=()=>setMode(S.source==='proxy'?'gemini':'proxy')})();
