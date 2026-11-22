@@ -1383,8 +1383,9 @@ async function updateBuiltinChars(P){for(const c of P.chars){const cur=CH.find(x
  for(const k of['name','bio','description','personality','scenario','mes_example','greetings','tags'])cur[k]=structuredClone(c[k]);for(const k of['sysOverride','phi'])if(c[k]==null)delete cur[k];else cur[k]=c[k];await saveChar(cur)}}
 /* ---------- GIỌNG NÓI: GPT-SoVITS TTS (Colab) + nhận giọng nói (Web Speech) ---------- */
 const VC=(()=>{
- const TD={url:'',auto:false,voice:'vita',lang:'auto',speed:1,viMode:'server',fallback:true};
- const T=()=>{if(!S.tts||typeof S.tts!=='object')S.tts={};for(const k in TD)if(S.tts[k]===undefined)S.tts[k]=TD[k];return S.tts};
+ const TD={engine:'browser',url:'',auto:false,voice:'vita',lang:'auto',speed:1,viMode:'server',fallback:true,bVoice:'',rate:1,pitch:1};
+ const T=()=>{if(!S.tts||typeof S.tts!=='object')S.tts={};const t=S.tts;if(t.v!==2){t.engine='browser';t.v=2;for(const k in TD)if(t[k]===undefined)t[k]=TD[k];try{saveS()}catch(e){}}for(const k in TD)if(t[k]===undefined)t[k]=TD[k];return t};
+ const isGsv=()=>T().engine==='gsv';
  const LANGS=[['auto','Tự nhận (auto)'],['ja','Tiếng Nhật (ja)'],['en','Tiếng Anh (en)'],['zh','Tiếng Trung (zh)'],['ko','Tiếng Hàn (ko)'],['yue','Quảng Đông (yue)']];
  const VI_RE=/[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i;
  const base=()=>String(T().url||'').trim().replace(/\/+$/,'').replace(/\/(health|tts)$/i,'');
@@ -1414,12 +1415,24 @@ const VC=(()=>{
  function unlock(){if(unlocked||playing)return;unlocked=true;try{audio.src=SIL;const p=audio.play();if(p&&p.catch)p.catch(()=>{unlocked=false})}catch(e){}
   try{const ss=window.speechSynthesis;if(ss){const u=new SpeechSynthesisUtterance(' ');u.volume=0;ss.speak(u)}}catch(e){}}
  ['pointerdown','touchend','keydown'].forEach(ev=>addEventListener(ev,unlock,{capture:true,passive:true}));
+ let VOICES_B=[];
+ function loadVoices(){const ss=window.speechSynthesis;if(!ss)return[];const v=ss.getVoices()||[];if(v.length)VOICES_B=v;return VOICES_B}
+ if(window.speechSynthesis){loadVoices();try{speechSynthesis.addEventListener('voiceschanged',()=>{loadVoices();fillVoiceSelects()})}catch(e){speechSynthesis.onvoiceschanged=()=>{loadVoices();fillVoiceSelects()}}
+  let k=0;const poll=setInterval(()=>{if(loadVoices().length||++k>20){clearInterval(poll);fillVoiceSelects()}},250)}
+ const vKey=v=>v.voiceURI||v.name;
+ const isVi=v=>/^vi([-_]|$)/i.test(v.lang||'');
+ function sortedVoices(){return loadVoices().slice().sort((a,b)=>(isVi(b)-isVi(a))||String(a.lang).localeCompare(String(b.lang))||String(a.name).localeCompare(String(b.name)))}
+ function voiceOptions(sel,first){const L=sortedVoices();const vi=L.filter(isVi),ot=L.filter(v=>!isVi(v));const o=v=>`<option value="${esc(vKey(v))}" ${vKey(v)===sel?'selected':''}>${esc(v.name)} (${esc(v.lang)})${v.localService===false?' · online':''}</option>`;
+  return`<option value="">${first}</option>`+(vi.length?`<optgroup label="Tiếng Việt">${vi.map(o).join('')}</optgroup>`:'')+(ot.length?`<optgroup label="Ngôn ngữ khác">${ot.map(o).join('')}</optgroup>`:'')+(sel&&!L.some(v=>vKey(v)===sel)?`<option value="${esc(sel)}" selected>${esc(sel)} (không có trên máy này)</option>`:'')}
+ function fillVoiceSelects(){const a=document.getElementById('s-ttsBVoice');if(a&&!a.matches(':focus'))a.innerHTML=voiceOptions(a.value||T().bVoice,'Tự chọn theo ngôn ngữ (ưu tiên tiếng Việt)');
+  const b=document.getElementById('f-ttsBVoice');if(b&&!b.matches(':focus'))b.innerHTML=voiceOptions(b.value||b.dataset.v||'','Theo cài đặt chung');const n=document.getElementById('s-ttsVCount');if(n)n.textContent=loadVoices().length?`${loadVoices().filter(isVi).length} giọng tiếng Việt · ${loadVoices().length} giọng trên máy này`:'Máy này chưa trả danh sách giọng (thử chạm Nghe thử)'}
+ const bOf=c=>{const t=T(),v=c?.tts||{};const num=(x,d)=>x===''||x==null||isNaN(+x)?d:+x;return{voice:v.bVoice||t.bVoice||'',rate:num(v.rate,+t.rate||1),pitch:num(v.pitch,+t.pitch||1)}};
  const voiceOf=c=>(c?.tts?.voice||'').trim()||T().voice||'vita';
  const langOf=c=>c?.tts?.lang||T().lang||'auto';
  function enqueue(it){it.gen=gen;Q.push(it);prefetch();if(!playing)next();mark()}
  function prefetch(){let n=0;for(const it of Q){if(n++>=2)break;if(!it.p)it.p=load(it)}}
- function useBrowser(it){return T().viMode==='browser'&&VI_RE.test(it.text)&&!/^(ja|zh|ko|yue)$/.test(it.lang)}
- async function load(it){if(useBrowser(it))return{browser:true,chosen:true};const u=base();
+ function useBrowser(it){return isGsv()&&T().viMode==='browser'&&VI_RE.test(it.text)&&!/^(ja|zh|ko|yue)$/.test(it.lang)}
+ async function load(it){if(!isGsv()||useBrowser(it))return{browser:true,chosen:true};const u=base();
   if(!u)return{browser:true,err:'Chưa có link máy chủ TTS'};if(Date.now()<downUntil)return{browser:true,err:'Máy chủ TTS vừa lỗi'};
   const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),60000);it.ctl=ctl;
   try{const r=await fetch(u+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:it.text,voice:it.voice,lang:it.lang,speed:+T().speed||1,format:'wav'}),signal:ctl.signal,cache:'no-store'});
@@ -1430,33 +1443,40 @@ const VC=(()=>{
   const res=await it.p;if(g!==gen){if(res.url)URL.revokeObjectURL(res.url);return}
   if(res.skip){return next()}
   if(res.browser){if(!res.chosen){if(!T().fallback){warn('{i:alert} Không đọc được: '+res.err);return next()}warn('{i:alert} '+res.err+' – tạm dùng giọng trình duyệt')}
-   await speakBrowser(it.text,g);if(g===gen)next();return}
+   await speakBrowser(it.text,g,it.bv);if(g===gen)next();return}
   await playUrl(res.url);URL.revokeObjectURL(res.url);if(g===gen)next()}
  function warn(t){if(Date.now()-lastWarn>45000){lastWarn=Date.now();toast(t,3500)}}
  function playUrl(url){return new Promise(res=>{const done=()=>{audio.onended=audio.onerror=null;curDone=null;res()};curDone=done;audio.onended=done;audio.onerror=done;audio.src=url;
   try{const p=audio.play();if(p&&p.catch)p.catch(e=>{if(e&&e.name==='NotAllowedError')toast('{i:alert} Trình duyệt chặn tự phát âm thanh – chạm màn hình rồi bấm nút loa',3500);done()})}catch(e){done()}})}
- function speakBrowser(text,g){return new Promise(res=>{const ss=window.speechSynthesis;if(!ss)return res();
-  const lang=/[\u3040-\u30ff]/.test(text)?'ja-JP':/[\uac00-\ud7af]/.test(text)?'ko-KR':/[\u4e00-\u9fff]/.test(text)?'zh-CN':VI_RE.test(text)||!/^[\x00-\x7F]*$/.test(text)?'vi-VN':(T().lang==='en'?'en-US':'vi-VN');
-  const u=new SpeechSynthesisUtterance(text);u.lang=lang;u.rate=Math.min(2,Math.max(.5,+T().speed||1));const v=ss.getVoices().find(x=>x.lang.replace('_','-').toLowerCase().startsWith(lang.slice(0,2)));if(v)u.voice=v;
-  let fin=false;const done=()=>{if(fin)return;fin=true;curDone=null;const k=UTT.indexOf(u);if(k>=0)UTT.splice(k,1);res()};curDone=done;u.onend=done;u.onerror=done;UTT.push(u);
-  setTimeout(done,4000+text.length*160);try{ss.speak(u)}catch(e){done()}})}
+ function pickVoice(key,lang){const L=loadVoices();if(key){const v=L.find(x=>vKey(x)===key||x.name===key);if(v)return v}
+  const p=lang.slice(0,2).toLowerCase();const m=L.filter(x=>String(x.lang).replace('_','-').toLowerCase().startsWith(p));return m.find(x=>x.default)||m.find(x=>x.localService)||m[0]||null}
+ function prosody(text,rate,pitch){let r=rate,p=pitch;const end=text.trim().slice(-3);
+  if(/[!！]/.test(end)){p*=1.12;r*=1.05}else if(/[?？]/.test(end)){p*=1.08}
+  if(/(\.\.\.|…)/.test(text)){r*=.88;p*=.97}if(/^["“「『]/.test(text.trim()))p*=1.02;
+  return{rate:Math.min(2,Math.max(.5,r)),pitch:Math.min(2,Math.max(0,p))}}
+ function speakBrowser(text,g,bv){return new Promise(res=>{const ss=window.speechSynthesis;if(!ss)return res();bv=bv||bOf(null);
+  let lang=/[\u3040-\u30ff]/.test(text)?'ja-JP':/[\uac00-\ud7af]/.test(text)?'ko-KR':/[\u4e00-\u9fff]/.test(text)?'zh-CN':'vi-VN';
+  let v=pickVoice(bv.voice,lang);if(v&&bv.voice&&lang!=='vi-VN'&&!String(v.lang).toLowerCase().startsWith(lang.slice(0,2)))v=pickVoice('',lang)||v;
+  const u=new SpeechSynthesisUtterance(text.replace(/\.{3,}/g,'…'));u.lang=v?.lang||lang;if(v)try{u.voice=v}catch(e){}const pr=prosody(text,bv.rate,bv.pitch);u.rate=pr.rate;u.pitch=pr.pitch;
+  let fin=false;const done=()=>{if(fin)return;fin=true;clearTimeout(to);if(curDone===done)curDone=null;const k=UTT.indexOf(u);if(k>=0)UTT.splice(k,1);res()};curDone=done;u.onend=done;u.onerror=done;UTT.push(u);
+  const to=setTimeout(done,(6000+text.length*220)/pr.rate);try{if(ss.paused)ss.resume();ss.speak(u)}catch(e){done()}})}
  function stop(){gen++;for(const it of Q){it.ctl?.abort();it.p?.then(r=>r&&r.url&&URL.revokeObjectURL(r.url))}Q.length=0;playing?.ctl?.abort();playing=null;sess=null;
   try{audio.pause()}catch(e){}try{window.speechSynthesis?.cancel()}catch(e){}const d=curDone;curDone=null;d&&d();mark()}
  /* --- đọc theo luồng khi AI đang viết --- */
  let sess=null,lastFeed=0;
  function wantAuto(c){const a=c?.tts?.auto;return hf.on||(a==='on'?true:a==='off'?false:!!T().auto)}
- function push(s,parts,final){for(const p of parts){s.buf=s.buf?s.buf+' '+p:p;if(s.buf.length>=(s.n===0?1:40)){emit(s,s.buf);s.buf=''}}if(final&&s.buf){emit(s,s.buf);s.buf=''}}
+ function push(s,parts,final){for(const p of parts){s.buf=s.buf?s.buf+' '+p:p;if(s.buf.length>=(s.n===0||!isGsv()?1:40)){emit(s,s.buf);s.buf=''}}if(final&&s.buf){emit(s,s.buf);s.buf=''}}
  function emit(s,text){const first=s.n===0;let pieces=first?splitLong(text,90):splitLong(text,200);if(first&&pieces.length>1){const [a,...r]=pieces;pieces=[a,...splitLong(r.join(' '),200)]}
-  for(const t of pieces){if(!/[\p{L}\p{N}]/u.test(t))continue;s.n++;enqueue({text:t,voice:s.voice,lang:s.lang,msgId:s.msgId})}}
+  for(const t of pieces){if(!/[\p{L}\p{N}]/u.test(t))continue;s.n++;enqueue({text:t,voice:s.voice,lang:s.lang,msgId:s.msgId,bv:s.bv})}}
  function start(target,c,ch,mode){if(mode==='swipe'||mode==='cont')stop();if(!wantAuto(c)||target.narrator){sess=null;return}
-  sess={msgId:target.id,voice:voiceOf(c),lang:langOf(c),n:0,buf:'',done:mode==='cont'?clean(shown(target,c,ch)).length:0}}
+  sess={msgId:target.id,voice:voiceOf(c),lang:langOf(c),bv:bOf(c),n:0,buf:'',done:mode==='cont'?clean(shown(target,c,ch)).length:0}}
  function feed(target,c,ch){const s=sess;if(!s||s.msgId!==target.id)return;const now=performance.now();if(now-lastFeed<150)return;lastFeed=now;
   const txt=clean(partial(shown(target,c,ch)));if(txt.length<=s.done)return;const r=cut(txt.slice(s.done),false);s.done+=r.used;push(s,r.parts,false)}
  function end(target,c,ch,ok){const s=sess;if(!s||s.msgId!==target.id)return;sess=null;if(!ok&&!msgText(target))return;
   const txt=clean(shown(target,c,ch));const r=cut(txt.slice(s.done),true);push(s,r.parts,true)}
  function playMsg(i){const ch=cur.chat,m=ch?.messages[i];if(!m)return;const on=playing?.msgId===m.id||Q.some(x=>x.msgId===m.id);stop();if(on)return;
   const c=m.role==='user'?null:msgChar(m,ch,cur.char);const txt=clean(shown(m,c,ch));if(!/[\p{L}\p{N}]/u.test(txt))return toast('Tin này không có lời thoại để đọc');
-  const s={msgId:m.id,voice:voiceOf(c||cur.char),lang:langOf(c||cur.char),n:0,buf:''};push(s,cut(txt,true).parts,true)}
+  const s={msgId:m.id,voice:voiceOf(c||cur.char),lang:langOf(c||cur.char),bv:bOf(c||cur.char),n:0,buf:''};push(s,cut(txt,true).parts,true)}
  function mark(){const ch=cur?.chat;document.querySelectorAll('#msgs [data-a="tts"]').forEach(b=>{const m=ch?.messages[+b.closest('.m')?.dataset.i];const on=!!m&&(playing?.msgId===m.id||Q.some(x=>x.msgId===m.id));
    if(b.classList.contains('on')!==on||!b.firstElementChild){b.classList.toggle('on',on);b.innerHTML=icon(on?'stop':'volume');b.title=on?'Dừng đọc':'Đọc to'}});updHF()}
  /* --- micro + rảnh tay --- */
@@ -1472,7 +1492,7 @@ const VC=(()=>{
   try{r.start();updHF()}catch(e){rec=null;toast('Không bật được micro: '+e.message)}}
  function setHF(on){hf.on=on;hf.empty=0;hf.wait=false;clearInterval(timer);
   if(on){toast('{i:headphones} Rảnh tay: nói → tự gửi → nghe trả lời → nói tiếp',3500);let idle=0;timer=setInterval(()=>{if(!document.getElementById('v-chat')?.classList.contains('on')){setHF(false);return}if(!hf.on||!hf.wait||rec)return idle=0;
-    if(!busy&&!playing&&!Q.length&&!sess){if(++idle>=2){idle=0;hf.wait=false;listen()}}else idle=0},350);if(!busy&&!playing)listen();else hf.wait=true}
+    if(!busy&&!playing&&!Q.length&&!sess&&!window.speechSynthesis?.speaking){if(++idle>=2){idle=0;hf.wait=false;listen()}}else idle=0},350);if(!busy&&!playing)listen();else hf.wait=true}
   else{if(rec)try{rec.abort()}catch(e){}}updHF()}
  function updHF(){const b=$('#c-mic');if(b){b.classList.toggle('rec',!!rec);b.classList.toggle('hf',hf.on);b.style.display=SR?'':'none'}
   let p=$('#c-hf');if(!p){const comp=document.querySelector('#v-chat .composer');if(!comp)return;p=document.createElement('div');p.id='c-hf';p.innerHTML='<span class="hfdot"></span><span class="hft"></span><button type="button">Tắt</button>';comp.insertBefore(p,comp.querySelector('.in'));p.querySelector('button').onclick=()=>setHF(false)}
@@ -1489,40 +1509,53 @@ const VC=(()=>{
   catch(e){throw new Error(e.name==='AbortError'?'Hết thời gian chờ (Colab đã tắt hoặc link sai?)':e.message==='Failed to fetch'||e.message==='Load failed'?'Không kết nối được (Colab đã tắt, link đã đổi, hoặc sai link)':e.message)}finally{clearTimeout(to)}}
  const opts=(L,v)=>L.map(([k,n])=>`<option value="${k}" ${k===v?'selected':''}>${n}</option>`).join('');
  const vlist=id=>`<datalist id="${id}">${cachedVoices().map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`;
- function settingsHtml(){const t=T();return sec('sec-voice','{i:volume} Giọng nói (GPT-SoVITS)',`<p class="hint" style="margin-top:0">Chạy notebook <b>RP_Chat_Voice_Server</b> trên Colab, rồi dán link <code>https://….trycloudflare.com</code> vào đây (hoặc bấm link 📱 trong Colab để tự điền). Link đổi mỗi lần chạy lại Colab.</p>
+ function settingsHtml(){const t=T();const rg=(id,label,v,min,max)=>`<label>${label}: <b id="${id}V">${(+v).toFixed(2)}</b></label><input id="${id}" type="range" min="${min}" max="${max}" step="0.05" value="${v}" oninput="document.getElementById('${id}V').textContent=(+this.value).toFixed(2)">`;
+ return sec('sec-voice','{i:volume} Giọng nói',`<label style="margin-top:0">Bộ đọc</label><select id="s-ttsEngine"><option value="browser" ${t.engine!=='gsv'?'selected':''}>Giọng trình duyệt (miễn phí)</option><option value="gsv" ${t.engine==='gsv'?'selected':''}>GPT-SoVITS (cần chạy Colab)</option></select>
+ <div id="tts-br" style="${t.engine==='gsv'?'display:none':''}"><p class="hint">Dùng giọng có sẵn của điện thoại/máy tính, không cần Colab. iPhone: tải thêm giọng tiếng Việt trong Cài đặt › Trợ năng › Nội dung được đọc › Giọng nói.</p>
+ <label>Giọng đọc</label><select id="s-ttsBVoice">${voiceOptions(t.bVoice,'Tự chọn theo ngôn ngữ (ưu tiên tiếng Việt)')}</select><p class="hint" id="s-ttsVCount"></p>
+ <div class="g2"><div>${rg('s-ttsRate','Tốc độ',+t.rate||1,0.5,2)}</div><div>${rg('s-ttsPitch','Cao độ',+t.pitch||1,0.5,1.8)}</div></div>
+ <p class="hint">Đọc từng câu, tự nâng giọng ở câu có ! và ?, chậm lại ở "…".</p></div>
+ <div id="tts-gsv" style="${t.engine==='gsv'?'':'display:none'}"><p class="hint">Chạy notebook <b>RP_Chat_Voice_Server</b> trên Colab, rồi dán link <code>https://….trycloudflare.com</code> vào đây (hoặc bấm link 📱 trong Colab để tự điền). Link đổi mỗi lần chạy lại Colab.</p>
  <label>Link máy chủ TTS</label><div class="row" style="flex-wrap:nowrap"><input id="s-ttsUrl" inputmode="url" autocomplete="off" placeholder="https://xxxx.trycloudflare.com" value="${esc(t.url)}"><button class="btn-g" id="s-ttsTest" type="button" style="flex:none">{i:check} Kiểm tra</button></div><div class="ttsres" id="s-ttsRes"></div>
  <div class="g2"><div><label>Giọng mặc định</label><input id="s-ttsVoice" list="ttsv" value="${esc(t.voice)}" placeholder="vita">${vlist('ttsv')}</div><div><label>Tốc độ đọc</label><input id="s-ttsSpeed" type="number" min="0.5" max="2" step="0.1" value="${+t.speed||1}"></div></div>
  <label>Ngôn ngữ đọc</label><select id="s-ttsLang">${opts(LANGS,t.lang)}</select>
  <label>Câu tiếng Việt</label><select id="s-ttsVi">${opts([['server','Vẫn đọc bằng GPT-SoVITS (bỏ dấu, lơ lớ)'],['browser','Đọc bằng giọng tiếng Việt của máy']],t.viMode)}</select>
- <p class="hint">GPT-SoVITS chỉ hỗ trợ Nhật, Anh, Trung, Hàn, Quảng Đông – <b>không có tiếng Việt</b>. Giọng vita học từ audio tiếng Nhật nên đọc tiếng Nhật hay nhất.</p>
+ <p class="hint">GPT-SoVITS chỉ hỗ trợ Nhật, Anh, Trung, Hàn, Quảng Đông – <b>không có tiếng Việt</b>.</p>
+ ${sw('s-ttsFallback',t.fallback,'Dùng giọng trình duyệt khi máy chủ TTS không trả lời')}</div>
  ${sw('s-ttsAuto',t.auto,'{i:volume} Tự động đọc câu trả lời (đọc từng câu ngay khi AI đang viết)')}
- ${sw('s-ttsFallback',t.fallback,'Dùng giọng trình duyệt khi máy chủ TTS không trả lời')}
  <div class="row" style="margin-top:12px"><button class="btn-g" id="s-ttsTry" type="button">{i:play} Nghe thử</button><button class="btn-g" id="s-ttsStop" type="button">{i:stop} Dừng</button></div>
- <p class="hint">Trong chat: {i:volume} dưới mỗi tin để nghe · {i:mic} cạnh ô nhập để nói (tiếng Việt) · <b>giữ</b> {i:mic} để bật/tắt trò chuyện rảnh tay.</p>`)}
- function collect(){const g=id=>document.getElementById(id);if(!g('s-ttsUrl'))return;const t=T();t.url=g('s-ttsUrl').value.trim().replace(/\/+$/,'');t.voice=g('s-ttsVoice').value.trim()||'vita';
-  t.speed=Math.min(2,Math.max(.5,+g('s-ttsSpeed').value||1));t.lang=g('s-ttsLang').value;t.viMode=g('s-ttsVi').value;t.auto=g('s-ttsAuto').checked;t.fallback=g('s-ttsFallback').checked}
- function wire(){const R=$('#s-ttsRes');if(!R)return;
+ <p class="hint">Trong chat: {i:volume} dưới mỗi tin để nghe · {i:mic} cạnh ô nhập để nói (tiếng Việt) · <b>giữ</b> {i:mic} để bật/tắt trò chuyện rảnh tay. Mỗi nhân vật có thể chọn giọng riêng ở Sửa nhân vật › Giọng nói.</p>`)}
+ function collect(){const g=id=>document.getElementById(id);if(!g('s-ttsEngine'))return;const t=T();t.engine=g('s-ttsEngine').value==='gsv'?'gsv':'browser';
+  t.url=g('s-ttsUrl').value.trim().replace(/\/+$/,'');t.voice=g('s-ttsVoice').value.trim()||'vita';t.speed=Math.min(2,Math.max(.5,+g('s-ttsSpeed').value||1));t.lang=g('s-ttsLang').value;t.viMode=g('s-ttsVi').value;t.fallback=g('s-ttsFallback').checked;
+  t.bVoice=g('s-ttsBVoice').value;t.rate=+g('s-ttsRate').value||1;t.pitch=+g('s-ttsPitch').value||1;t.auto=g('s-ttsAuto').checked}
+ const SAMPLE='Xin chào Quản lý! Hôm nay anh thế nào? Tôi đã đợi anh… lâu lắm rồi đấy.';
+ function wire(){const R=$('#s-ttsRes');if(!R)return;fillVoiceSelects();
+  $('#s-ttsEngine').onchange=e=>{const g=e.target.value==='gsv';$('#tts-gsv').style.display=g?'':'none';$('#tts-br').style.display=g?'none':''};
   $('#s-ttsTest').onclick=async()=>{collect();saveS();R.textContent='Đang kiểm tra…';try{const j=await health();
     R.innerHTML=`{i:check} Kết nối OK · ${esc(j.engine||'')} ${esc(j.model_version||'')} · ${esc(j.device||'')}<br>Giọng: <b>${esc((j.voices||[]).join(', '))}</b><br>Ngôn ngữ: ${esc((j.languages||[]).filter(x=>!/^(all_|auto)/.test(x)).join(', '))}`;
     const dl=$('#ttsv');if(dl)dl.innerHTML=(j.voices||[]).map(v=>`<option value="${esc(v)}">`).join('')}
    catch(e){R.textContent='{i:close} '+e.message}};
-  $('#s-ttsTry').onclick=()=>{collect();saveS();stop();const s={msgId:'_try',voice:T().voice,lang:T().lang,n:0,buf:''};push(s,cut('こんにちは、マネージャー。今日もよろしくね。 Xin chào, đây là giọng đọc thử.',true).parts,true)};
+  $('#s-ttsTry').onclick=()=>{collect();saveS();stop();const s={msgId:'_try',voice:T().voice,lang:T().lang,bv:bOf(null),n:0,buf:''};push(s,cut(isGsv()?'こんにちは、マネージャー。今日もよろしくね。 '+SAMPLE:SAMPLE,true).parts,true)};
   $('#s-ttsStop').onclick=()=>stop()}
- function charHtml(c){const v=c.tts||{};return`<details class="sub" ${v.voice||v.lang||v.auto?'open':''}><summary>{i:volume} Giọng nói</summary>
- <label>Giọng (để trống = giọng mặc định trong Cài đặt)</label><input id="f-ttsVoice" list="ttsvc" value="${esc(v.voice||'')}" placeholder="${esc(T().voice||'vita')}">${vlist('ttsvc')}
- <div class="g2"><div><label>Ngôn ngữ đọc</label><select id="f-ttsLang">${opts([['','Theo cài đặt chung'],...LANGS],v.lang||'')}</select></div><div><label>Tự đọc tin của nhân vật này</label><select id="f-ttsAuto">${opts([['','Theo cài đặt chung'],['on','Luôn tự đọc'],['off','Không tự đọc']],v.auto||'')}</select></div></div>
+ function charHtml(c){const v=c.tts||{};return`<details class="sub" ${v.voice||v.lang||v.auto||v.bVoice||v.rate||v.pitch?'open':''}><summary>{i:volume} Giọng nói</summary>
+ <label>Giọng trình duyệt</label><select id="f-ttsBVoice" data-v="${esc(v.bVoice||'')}">${voiceOptions(v.bVoice||'','Theo cài đặt chung')}</select>
+ <div class="g2"><div><label>Tốc độ (trống = chung)</label><input id="f-ttsRate" type="number" min="0.5" max="2" step="0.05" placeholder="${+T().rate||1}" value="${v.rate??''}"></div><div><label>Cao độ (trống = chung)</label><input id="f-ttsPitch" type="number" min="0.5" max="1.8" step="0.05" placeholder="${+T().pitch||1}" value="${v.pitch??''}"></div></div>
+ <div class="g2"><div><label>Giọng GPT-SoVITS</label><input id="f-ttsVoice" list="ttsvc" value="${esc(v.voice||'')}" placeholder="${esc(T().voice||'vita')}">${vlist('ttsvc')}</div><div><label>Tự đọc tin của nhân vật này</label><select id="f-ttsAuto">${opts([['','Theo cài đặt chung'],['on','Luôn tự đọc'],['off','Không tự đọc']],v.auto||'')}</select></div></div>
+ <label>Ngôn ngữ đọc (GPT-SoVITS)</label><select id="f-ttsLang">${opts([['','Theo cài đặt chung'],...LANGS],v.lang||'')}</select>
  <button class="btn-g" id="f-ttsTry" type="button" style="margin-top:10px">{i:play} Nghe thử giọng này</button></details>`}
- function charCollect(c){const g=id=>document.getElementById(id);if(!g('f-ttsVoice'))return;const v={voice:g('f-ttsVoice').value.trim(),lang:g('f-ttsLang').value,auto:g('f-ttsAuto').value};if(v.voice||v.lang||v.auto)c.tts=v;else delete c.tts}
- function charWire(c){const b=$('#f-ttsTry');if(b)b.onclick=()=>{charCollect(c);stop();const s={msgId:'_try',voice:voiceOf(c),lang:langOf(c),n:0,buf:''};const g=clean(fill(c.greetings?.[0]||'',c,null)).slice(0,160);push(s,cut(g&&g!=='(tạo câu chuyện của bạn)'?g:'こんにちは、マネージャー。'+(c.name?' '+c.name+'.':''),true).parts,true)}}
+ function charCollect(c){const g=id=>document.getElementById(id);if(!g('f-ttsVoice'))return;const n=x=>{const y=g(x).value.trim();return y===''||isNaN(+y)?'':Math.min(2,Math.max(.5,+y))};
+  const v={voice:g('f-ttsVoice').value.trim(),lang:g('f-ttsLang').value,auto:g('f-ttsAuto').value,bVoice:g('f-ttsBVoice').value,rate:n('f-ttsRate'),pitch:n('f-ttsPitch')};
+  for(const k in v)if(v[k]==='')delete v[k];if(Object.keys(v).length)c.tts=v;else delete c.tts}
+ function charWire(c){fillVoiceSelects();const b=$('#f-ttsTry');if(b)b.onclick=()=>{charCollect(c);stop();const s={msgId:'_try',voice:voiceOf(c),lang:langOf(c),bv:bOf(c),n:0,buf:''};const g=clean(fill(c.greetings?.[0]||'',c,null)).slice(0,160);push(s,cut(g&&g!=='(tạo câu chuyện của bạn)'?g:'Xin chào Quản lý! Tôi là '+(c.name||'nhân vật của bạn')+'. Rất vui được gặp anh.',true).parts,true)}}
  function menuItems(){return[['{i:volume} Tự đọc câu trả lời: '+(T().auto?'Bật':'Tắt'),()=>{T().auto=!T().auto;saveS();toast('Tự đọc câu trả lời: '+(T().auto?'Bật':'Tắt'))}],
   SR?['{i:headphones} Trò chuyện rảnh tay: '+(hf.on?'Bật':'Tắt'),()=>setHF(!hf.on)]:null,(playing||Q.length)?['{i:stop} Dừng đọc',()=>stop()]:null]}
  function init(){T();const m=/[#&]tts=([^&]+)/.exec(location.hash||'');if(!m)return;let u='';try{u=decodeURIComponent(m[1]).trim()}catch(e){}
   try{history.replaceState(history.state,'',location.pathname+location.search)}catch(e){}
-  if(!/^https?:\/\/[^\s]+$/i.test(u))return;T().url=u.replace(/\/+$/,'');saveS();
+  if(!/^https?:\/\/[^\s]+$/i.test(u))return;T().url=u.replace(/\/+$/,'');T().engine='gsv';saveS();
   setTimeout(()=>{toast('{i:volume} Đã lưu link máy chủ giọng nói – đang kiểm tra…',2500);health().then(j=>toast('{i:check} Máy chủ giọng nói OK · giọng: '+(j.voices||[]).join(', '),4000)).catch(e=>toast('{i:alert} '+e.message,4500))},700)}
  init();
  return{T,clean,partial,cut,splitLong,start,feed,end,stop,playMsg,mark,listen,setHF,wireMic,settingsHtml,collect,wire,charHtml,charCollect,charWire,menuItems,health,
-  get state(){return{playing:playing&&{text:playing.text,msgId:playing.msgId},queue:Q.map(x=>x.text),hf:{...hf,listening:!!rec},sess:sess&&{...sess},downUntil}},_audio:audio}
+  voices:()=>loadVoices(),bOf,prosody,get state(){return{playing:playing&&{text:playing.text,msgId:playing.msgId},queue:Q.map(x=>x.text),hf:{...hf,listening:!!rec},sess:sess&&{...sess},downUntil}},_audio:audio}
 })();
 
 VC.wireMic();
