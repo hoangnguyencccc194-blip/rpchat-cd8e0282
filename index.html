@@ -337,7 +337,7 @@ function iconize(root){const re=/\{i:([a-z-]+)\}/;const w=document.createTreeWal
 new MutationObserver(ms=>{for(const m of ms){if(m.target.closest?.('.tx'))continue;for(const n of m.addedNodes){if(n.nodeType===1)iconize(n);else if(n.nodeType===3&&n.parentNode)iconize(n.parentNode)}}}).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>iconize(document.body));iconize(document.body||document.documentElement);
 
-window.SEED_URL='seed.json?v=85e5aad720';
+window.SEED_URL='seed.json?v=a3abbbaf7e';
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1359,7 +1359,7 @@ function showAccount(){const u=SY.user();
  q('#acc-go').onclick=go_;q('#acc-p').onkeydown=e=>{if(e.key==='Enter')go_()};setTimeout(()=>q('#acc-u').focus(),60)}
 
 /* ---------- SEED / INIT ---------- */
-const SEED_VER=3;
+const SEED_VER=4;
 const loreHash=l=>hashStr((l.entries||[]).map(e=>[e.comment||'',(e.keys||[]).join(','),e.content||'',e.enabled===false?'0':'1'].join('\u0001')).join('\u0002'));
 /* update built-in lorebooks the user already has: replace if unedited (matches an earlier built-in version), else only add entries they don't have */
 async function updateBuiltinLore(P){for(const l of P.lorebooks){const cur=LB.find(x=>x.id===l.id);if(!cur||!Array.isArray(l.prevHashes))continue;const h=loreHash(cur);if(h===loreHash(l))continue;
