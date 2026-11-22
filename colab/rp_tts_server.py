@@ -4,7 +4,7 @@
 import os, sys, io, re, json, time, argparse, threading, traceback
 now_dir = os.getcwd()
 sys.path.insert(0, now_dir); sys.path.insert(0, os.path.join(now_dir, "GPT_SoVITS"))
-os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ["MPLBACKEND"] = "Agg"  # Colab sets module://matplotlib_inline..., which breaks outside the kernel
 
 import numpy as np, soundfile as sf, torch, torchaudio
 
