@@ -672,12 +672,12 @@ async function proxyStream(body,onText){const key=getProxyKey(),url=normProxyUrl
  const mapF=f=>({stop:'STOP',length:'MAX_TOKENS',content_filter:'SAFETY'}[f]||f||'');let full='',finish='';
  const ct=res.headers.get('content-type')||'';
  if(!/event-stream/i.test(ct)){const t=await res.text();let j=null;try{j=JSON.parse(t)}catch(e){}
-  if(j){if(j.error)throw new Error('Proxy lỗi: '+(j.error.message||JSON.stringify(j.error)));const c=j.choices?.[0];full=c?.message?.content??c?.text??'';if(full)onText(full);return{text:full,finish:mapF(c?.finish_reason),block:''}}
+  if(j){if(j.error)throw upstreamErr(j.error,'Proxy lỗi: ');const c=j.choices?.[0];if(isErrFin(c?.finish_reason))throw upstreamErr(c?.message?.content??c?.text??'','Proxy lỗi: ');full=c?.message?.content??c?.text??'';if(full)onText(full);return{text:full,finish:mapF(c?.finish_reason),block:''}}
   if(!/^\s*data:/m.test(t))throw new Error('Proxy trả về dữ liệu không đọc được:\n'+t.slice(0,400));
   for(const line of t.split('\n'))sseLine(line);return{text:full,finish,block:''}}
  function sseLine(line){line=line.trim();if(!line.startsWith('data:'))return;const js=line.slice(5).trim();if(!js||js==='[DONE]')return;let j;try{j=JSON.parse(js)}catch(e){return}
-  if(j.error)throw new Error('Proxy lỗi: '+(j.error.message||JSON.stringify(j.error)));const c=j.choices?.[0];if(!c)return;
-  const t=c.delta?.content??c.message?.content??c.text??'';if(t){full+=t;onText(full)}if(c.finish_reason)finish=mapF(c.finish_reason)}
+  if(j.error)throw upstreamErr(j.error,'Proxy lỗi: ');const c=j.choices?.[0];if(!c)return;
+  const t=c.delta?.content??c.message?.content??c.text??'';if(isErrFin(c.finish_reason))throw upstreamErr(t,'Proxy lỗi: ');if(t){full+=t;onText(full)}if(c.finish_reason)finish=mapF(c.finish_reason)}
  const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
  while(true){let done,value;try{({done,value}=await rd.read())}catch(e){if(e.name==='AbortError')throw e;throw Object.assign(new Error('Mất kết nối giữa chừng ('+e.message+')'),{net:true})}if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf('\n'))>=0){sseLine(buf.slice(0,i));buf=buf.slice(i+1)}}sseLine(buf);
  return{text:full,finish:finish||'STOP',block:''}}
@@ -714,29 +714,43 @@ function modeInfo(){const px=S.source==='proxy';if(px){const p=activeProxy();let
 function updMode(){const i=modeInfo();const c=$('#c-mode');if(c){c.textContent=i.px?'Proxy':'API';c.title='Đang dùng '+i.label+' ('+i.detail+') – bấm để đổi';c.classList.toggle('px',i.px)}
  const box=$('#s-mode');if(box){box.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('on',(b.dataset.mode==='proxy')===i.px));const h=box.querySelector('#s-source');if(h)h.value=i.px?'proxy':'gemini';const d=box.querySelector('.mdet');if(d)d.innerHTML='Đang dùng: <b>'+esc(i.label)+'</b> – '+esc(i.detail)+(i.warn?'<br><span style="color:#f0b86e">'+esc(i.warn)+'</span>':'')}}
 function setMode(m,quiet){S.source=m==='proxy'?'proxy':'gemini';saveS();updMode();if(!quiet){const i=modeInfo();toast((i.px?'Đang chat qua Proxy: ':'Đang chat bằng API key: ')+i.detail+(i.warn?'\n'+i.warn:''),3500)}}
-async function aiOnce(req,onText,model){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b,model&&model!==S.model.trim()?{model}:undefined);
+async function aiOnce(req,onText0,model){let shown=false;const onText=t=>{if(!shown&&looksErr(t))return;shown=true;onText0(t)};
+ let fn=S.source==='proxy'?b=>proxyStream(model&&req.oai&&model!==req.oai.model?{...req.oai,model}:req.oai,b):b=>geminiStream(req.body,b,model&&model!==S.model.trim()?{model}:undefined);
  if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/(^|\D)404(\D|$)|not found/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
- const fin=r=>{if(r&&typeof r.text==='string'){r.raw=r.text;r.text=cleanReply(r.text).replace(/\s+$/,'')}return r};
+ const fin=r=>{if(r&&typeof r.text==='string'&&looksErr(r.text)&&r.text.length<1500)throw upstreamErr(r.text,S.source==='proxy'?'Proxy lỗi: ':'');if(r&&typeof r.text==='string'){r.raw=r.text;r.text=cleanReply(r.text).replace(/\s+$/,'')}return r};
  if(STREAM()){const r=fin(await fn(t=>onText(cleanReply(t,true))));if(r&&typeof r.text==='string')onText(r.text);return r}
  const r=fin(await fn(()=>{}));if(r.text)onText(r.text);return r}
 
 /* ---------- AUTO RETRY (503/429/5xx/mạng/trả về trống) ---------- */
+const ERR_RE=/(returned|error)\W{0,3}(503|429|500|502|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|try again later/i;
+const ERR_HEAD=/^\s*(?:[\[{(]\s*)?(?:"?error"?|google ai|gemini|proxy|api|http|upstream|request|unavailable|resource_exhausted|internal|model|lỗi|[45]\d\d\b)/i;
+function looksErr(t){t=String(t||'');return t.length<1500&&ERR_HEAD.test(t)&&ERR_RE.test(t.slice(0,400))}
+function isErrFin(f){return String(f||'').toLowerCase()==='error'}
+function upstreamErr(x,pre=''){let t=typeof x==='string'?x:(x?.message||'')+(x?.status&&typeof x.status==='string'?' ['+x.status+']':'');if(!t)t=JSON.stringify(x||'');t=t.trim();
+ const e=new Error(pre+(t||'Lỗi không rõ'));e.upstream=true;let st=+(typeof x==='object'&&x?(x.code||(/^\d{3}$/.test(x.status)?x.status:0)):0)||0;
+ if(!st){const m=t.match(/\b(?:returned|error|http|code|status)\W{0,3}([45]\d\d)\b/i)||t.match(/^\W*([45]\d\d)\b/);if(m)st=+m[1]}
+ if(!st){if(/UNAVAILABLE|high demand|overloaded|try again later/i.test(t))st=503;else if(/RESOURCE_EXHAUSTED|rate.?limit/i.test(t))st=429;else if(/\bINTERNAL\b/.test(t))st=500}
+ if(!st){if(/DEADLINE_EXCEEDED|timed? ?out|network error|error connecting|connection (?:reset|refused|aborted)|during streaming/i.test(t))e.net=true;
+  else if(/trả về trống|no content received|empty/i.test(t)&&!/block|safety|prohibited|blocklist|recitation/i.test(t))e.empty=true}
+ e.status=st;e.delay=retryDelayOf(typeof x==='string'?x:JSON.stringify({error:x}));return e}
+const PROXY_NB_MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash','gemini-3.5-flash-lite'];/* model list offered by colab/proxy_co_anh.ipynb */
 const RETRY_CODES=[429,500,502,503,504],HARD_FIN=['SAFETY','PROHIBITED_CONTENT','BLOCKLIST','SPII','IMAGE_SAFETY'];
 function retryDelayOf(t,h){let ms=0;try{const v=h?.get?.('retry-after');if(v)ms=isNaN(+v)?Math.max(0,Date.parse(v)-Date.now()):+v*1000}catch(e){}
  if(!ms)try{let j=JSON.parse(t);j=Array.isArray(j)?j[0]:j;const d=(j?.error?.details||[]).find(x=>/RetryInfo/.test(x?.['@type']||''));if(d?.retryDelay)ms=parseFloat(d.retryDelay)*1000}catch(e){}
  return ms>0?Math.min(ms,120000):0}
-function fallbackModels(){return S.source==='proxy'?[]:String(S.retryFallback||'').split(/[,\n]/).map(x=>x.trim()).filter(x=>x&&x!==S.model.trim()).filter((x,i,a)=>a.indexOf(x)===i)}
+function primaryModel(req){return S.source==='proxy'?String(req?.oai?.model||S.proxyModel||'').trim():S.model.trim()}
+function fallbackModels(req){const pm=primaryModel(req);return String(S.retryFallback||'').split(/[,\n]/).map(x=>x.trim()).filter(x=>x&&x!==pm).filter((x,i,a)=>a.indexOf(x)===i)}
 function retryReason(e){if(e.empty)return'trả về trống';if(e.net)return'lỗi mạng';return e.status+({429:' quá giới hạn',500:' lỗi máy chủ',502:' lỗi cổng',503:' quá tải',504:' hết thời gian'}[e.status]||'')}
 function retrySleep(ms,last){abortCtl=new AbortController();const sig=abortCtl.signal;return new Promise((ok,no)=>{const t=setTimeout(ok,ms);sig.addEventListener('abort',()=>{clearTimeout(t);no(Object.assign(new DOMException('Đã hủy thử lại','AbortError'),{last}))},{once:true})})}
 async function aiStream(req,onText,opt={}){const on=S.retryOn!==false&&!opt.noRetry,max=Math.max(0,+S.retryMax||0),per=Math.max(1,+S.retryFbAfter||3);
- const models=[S.model.trim(),...(on?fallbackModels():[])];let n=0,mi=0,fails=0,emp=0;
+ const models=[primaryModel(req),...(on?fallbackModels(req):[])];let n=0,mi=0,fails=0,emp=0;
  for(;;){let r=null,e0;const model=models[mi];
   try{r=await aiOnce(req,onText,model);
    if(!on||(r.text||'').trim()||r.block||HARD_FIN.includes(r.finish)){if(mi&&(r.text||'').trim())toast('Đã trả lời bằng model dự phòng: '+model,3500);opt.onRetry?.(null);return r}
    e0={empty:true,message:finishNote(r)||'Không có nội dung trả về'};emp++;if(!max&&emp>=5){opt.onRetry?.(null);return r}}
-  catch(e){if(!on||e.name==='AbortError'||!(e.net||RETRY_CODES.includes(e.status)||(mi>0&&e.status===404)))throw e;e0=e}
+  catch(e){if(!on||e.name==='AbortError'||!(e.net||e.empty||RETRY_CODES.includes(e.status)||(mi>0&&(e.status===404||/not.?found/i.test(e.message)))))throw e;e0=e;if(e.empty){emp++;if(!max&&emp>=5){opt.onRetry?.(null);throw e}}}
   n++;if(max&&n>=max){opt.onRetry?.(null);if(e0.empty)return r;throw e0}
-  fails++;let sw=false;if(models.length>1&&(fails>=per||(mi>0&&e0.status===404))){mi=(mi+1)%models.length;fails=0;sw=true}
+  fails++;let sw=false;if(models.length>1&&(fails>=per||(mi>0&&(e0.status===404||/not.?found/i.test(e0.message||''))))){mi=(mi+1)%models.length;fails=0;sw=true}
   const wait=e0.delay||Math.min(30000,2000*2**Math.min(n-1,4)*(0.8+Math.random()*0.4));
   const info={n:n+1,wait,reason:retryReason(e0),model:models[mi],switched:sw,fallback:mi>0,last:String(e0.message||'').split('\n')[0]};
   if(opt.onRetry)opt.onRetry(info);else toast(`Đang thử lại (lần ${info.n}) sau ${Math.round(wait/1000)}s… · ${info.reason}`+(info.fallback?' · '+info.model:''),Math.min(wait,6000));
@@ -1204,10 +1218,11 @@ function renderSettings(){const B=$('#s-body');B.innerHTML=`<div class="sec" sty
  <label>Model</label><input id="s-model" list="models" value="${esc(S.model)}"><datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"><option value="gemini-2.5-flash-lite"></datalist>
  <div class="g3">${num('temperature','Temperature',S.temperature,'step="0.05" min="0" max="2"')}${num('maxTokens','Token trả lời',S.maxTokens)}${num('topP','Top P',S.topP,'step="0.01" min="0" max="1"')}</div>
  ${sw('s-civic',S.civic,'Gửi cả CIVIC_INTEGRITY=BLOCK_NONE (tự bỏ nếu model báo lỗi)')}
- ${sw('s-retryOn',S.retryOn!==false,'Tự động thử lại khi lỗi 503 quá tải / 429 / 500 / lỗi mạng / trả về trống (chờ 2s, 4s, 8s… tối đa 30s)')}
+`)+
+ sec('sec-retry','{i:refresh} Tự động thử lại',`${sw('s-retryOn',S.retryOn!==false,'Tự động thử lại khi lỗi 503 quá tải / 429 / 500 / lỗi mạng / trả về trống – cả khi dùng Proxy (chờ 2s, 4s, 8s… tối đa 30s)')}
  <div class="g3">${num('retryMax','Số lần thử tối đa (0 = đến khi được)',S.retryMax??0,'min="0" step="1"')}${num('retryFbAfter','Đổi model dự phòng sau … lần lỗi',S.retryFbAfter??3,'min="1" step="1"')}</div>
  <label>Model dự phòng (cách nhau dấu phẩy, thử lần lượt – để trống nếu không dùng)</label><div class="row" style="flex-wrap:nowrap"><input id="s-retryFallback" list="models" value="${esc(S.retryFallback||'')}" placeholder="vd: gemini-2.5-flash-lite, gemini-2.0-flash" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn-g" id="s-fbsug" type="button">Gợi ý</button></div>
- <p class="mut" style="margin-top:6px">Chỉ dùng khi chat bằng API key. Bấm Gợi ý để điền các model Gemini còn lại trong danh sách (khác model chính). Lỗi 400/401/403 và nội dung bị chặn sẽ không thử lại.</p>`)+
+ <p class="mut" style="margin-top:6px">Dùng cho cả API key lẫn Proxy (proxy Colab nhận tên model trong mỗi yêu cầu). Bấm Gợi ý để điền vài model khác model chính, rồi bấm Lưu. Lỗi 400/401/403 và nội dung bị chặn sẽ không thử lại.</p>`)+
  sec('sec-proxy','{i:globe} Proxy',`<p class="hint" style="margin-top:0">Chọn chat bằng API key hay Proxy ở mục <b>Chế độ kết nối</b> trên cùng. Lưu/chọn một proxy ở đây sẽ chuyển sang chế độ Proxy.</p>
  <label style="margin-top:14px">Cấu hình proxy đã lưu</label><div id="px-list">${proxyListHtml()}</div>
  <button class="btn-g" id="px-add" style="width:100%;margin-top:4px">{i:plus} Thêm proxy</button>
@@ -1243,7 +1258,7 @@ Trong tin bạn gửi, macro (vd xúc xắc) được tính ngay lúc gửi.</p>
  <label>Độ tối lớp phủ ảnh nền: <b id="s-bgdv">${S.bgDim}%</b></label><input type="range" id="s-bgDim" min="0" max="95" value="${S.bgDim}">`)+
  sec('sec-data','{i:save} Dữ liệu',`<p class="mut">Lưu trữ: ${DB.mem?'localStorage (dự phòng)':'IndexedDB'} · ${CH.length} nhân vật · ${LB.length} lorebook · ${CT.length} chat · ${GR.length} nhóm</p><div class="row"><button class="btn-g" id="s-exp">{i:download} Sao lưu tất cả (JSON)</button><button class="btn-g" id="s-imp">{i:upload} Khôi phục từ file</button><button class="btn-d" id="s-wipe">Xóa toàn bộ</button></div><p class="mut">File sao lưu gồm nhân vật, lorebook, chat (kèm ảnh), persona, regex, cài đặt – KHÔNG gồm API key hay Proxy key.</p>`);
  VC.wire();$('#s-acc').onclick=()=>showAccount();B.querySelectorAll('details.sec').forEach(d=>d.ontoggle=()=>d.open?openSecs.add(d.id):openSecs.delete(d.id));
- {const fb=$('#s-fbsug');if(fb)fb.onclick=()=>{const m=($('#s-model').value||'').trim();$('#s-retryFallback').value=[...document.querySelectorAll('#models option')].map(o=>o.value).filter(v=>v&&v!==m&&(/pro/.test(m)||!/pro/.test(v))).sort((x,y)=>/lite/.test(y)-/lite/.test(x)).join(', ')}}
+ {const fb=$('#s-fbsug');if(fb)fb.onclick=()=>{const px=S.source==='proxy',m=(px?S.proxyModel:($('#s-model').value||'')).trim();const pool=px?[...document.querySelectorAll('#px-ml option')].map(o=>o.value).concat(PROXY_NB_MODELS):[...document.querySelectorAll('#models option')].map(o=>o.value);const L=pool.filter((v,i,a)=>v&&v!==m&&a.indexOf(v)===i&&/^gemini-/i.test(v)&&(/pro/.test(m)||!/pro/.test(v))).sort((x,y)=>/lite/.test(x)-/lite/.test(y)).slice(0,3);if(!px)L.sort((x,y)=>/lite/.test(y)-/lite/.test(x));$('#s-retryFallback').value=L.join(', ');if(!L.length)toast('Không có model gợi ý – tự nhập tên model')}}
  $('#s-eye').onclick=()=>{const k=$('#s-key');k.type=k.type==='password'?'text':'password'};wireProxyList();B.querySelectorAll('#s-mode [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));updMode();
  $('#s-reset').onclick=()=>{$('#s-sysPrompt').value=DEFAULT_SYS};
  const rer=()=>{collectS();saveS();renderSettings()};
