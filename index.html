@@ -368,9 +368,9 @@ const DEF_CONT='[OOC: Continue your previous reply exactly from where it stopped
 const DEF_IMP="[OOC: For this one message only, write {{user}}'s next message yourself, as {{user}} would write it: same perspective, style and language as {{user}}'s earlier messages, consistent with the story so far. Do not write {{char}}'s reply. Output only {{user}}'s message text.]";
 const DEF_QR=[{label:'OOC',text:'OOC: ',send:false},{label:'Tiếp tục cảnh',text:'*Câu chuyện tiếp diễn.*',send:true},{label:'Mô tả xung quanh',text:'OOC: Hãy mô tả chi tiết khung cảnh xung quanh lúc này.',send:true},{label:'Tung xúc xắc',text:'*Tung xúc xắc: {{roll:1d20}}*',send:false}];
 const DEF={model:'gemini-2.5-flash',temperature:0.9,maxTokens:2048,topP:0.95,topK:0,minP:0,repPen:1,freqPen:0,presPen:0,stopStrings:'',maxContext:120000,userName:'Hoang',persona:'',sysPrompt:DEFAULT_SYS,jailbreak:'',contNudge:DEF_CONT,impPrompt:DEF_IMP,nameStop:true,
- anDefault:'',anDepth:4,anFreq:1,scanDepth:4,loreBudget:4000,wiRecursive:true,wiCase:false,wiWhole:false,imgLimit:4,civic:true,source:'gemini',autoSum:true,sumEvery:20,sumKeep:12,proxyUrl:'',proxyModel:'',
+ anDefault:'',anDepth:4,anFreq:1,scanDepth:4,loreBudget:4000,wiRecursive:true,wiCase:false,wiWhole:false,imgLimit:4,civic:true,source:'gemini',sumKeep:12,proxyUrl:'',proxyModel:'',
  personas:null,defPersona:'',regex:[],qr:null,showQr:true,bgImage:'',bgDim:55,accent:'violet'};
-let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('rp_settings')||'{}'));
+let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('rp_settings')||'{}'));delete S.autoSum;delete S.sumEvery;
 if(!Array.isArray(S.personas)||!S.personas.length){S.personas=[{id:'p_default',name:S.userName||'User',desc:S.persona||'',avatar:''}];S.defPersona='p_default'}
 if(!Array.isArray(S.qr))S.qr=DEF_QR.map(x=>({...x}));if(!Array.isArray(S.regex))S.regex=[];
 const saveS=()=>{try{localStorage.setItem('rp_settings',JSON.stringify(S));if(typeof SY!=='undefined'){SY.mark('settings','main');SY.mark('secrets','keys')}}catch(e){toast('Bộ nhớ trình duyệt đầy – ảnh nền quá lớn?')}};
@@ -691,7 +691,7 @@ async function summarize(c,ch,force){if(sumBusy)return false;const keep=+S.sumKe
  sumBusy=true;try{toast('{i:brain} Đang tóm tắt…');const r=await aiStream(req,()=>{});if(!r.text?.trim())throw new Error('AI không trả về tóm tắt.');ch.summary=r.text.trim();ch.sumUpTo=part[part.length-1].id;await saveChat(ch);toast('{i:brain} Đã cập nhật tóm tắt');return true}
  catch(e){toast('{i:xc} Tóm tắt lỗi: '+e.message);return false}finally{sumBusy=false;abortCtl=null}}
 function showMemory(){const{char:c,chat:ch}=cur;modal(`<h3>{i:brain} Bộ nhớ trò chuyện</h3><label>Ghi nhớ (luôn được chèn vào prompt)</label><textarea id="mm-mem" rows="5" placeholder="Điều AI cần luôn nhớ trong chat này…">${esc(ch.memory||'')}</textarea>
- <label>Tóm tắt tự động (có thể sửa)</label><textarea id="mm-sum" rows="8" placeholder="Chưa có tóm tắt.">${esc(ch.summary||'')}</textarea><p class="mut" id="mm-info"></p>
+ <label>Tóm tắt (bấm “Tóm tắt ngay” khi muốn, có thể sửa)</label><textarea id="mm-sum" rows="8" placeholder="Chưa có tóm tắt.">${esc(ch.summary||'')}</textarea><p class="mut" id="mm-info"></p>
  <div class="row" style="margin-top:8px"><button class="btn-p" id="mm-save">Lưu</button><button class="btn-g" id="mm-now">Tóm tắt ngay</button><button class="btn-d" id="mm-clr">Xóa tóm tắt</button></div>`,m=>{
  const info=()=>{const i=ch.sumUpTo?ch.messages.findIndex(x=>x.id===ch.sumUpTo):-1;m.querySelector('#mm-info').textContent=ch.summary?.trim()?(i>=0?`Đã tóm tắt ${i+1}/${ch.messages.length} tin; gửi nguyên văn ${ch.messages.length-i-1} tin sau đó.`:'Điểm tóm tắt không còn (tin đã bị xóa) – gửi toàn bộ lịch sử.'):'Chưa tóm tắt – gửi toàn bộ lịch sử.'};info();
  m.querySelector('#mm-save').onclick=async()=>{ch.memory=m.querySelector('#mm-mem').value;ch.summary=m.querySelector('#mm-sum').value;await saveChat(ch);toast('Đã lưu bộ nhớ');m.remove()};
@@ -1056,7 +1056,6 @@ async function generate(mode,errNote,speakerId){const{char:c0,chat:ch}=cur;if(bu
  busy=false;target.streaming=false;abortCtl=null;target.swipes[target.sw]=applyRegex(msgText(target).replace(/\s+$/,''),'ai','edit');
  if(err&&!msgText(target)){if(mode==='swipe'){target.swipes.pop();target.sw=Math.max(0,target.swipes.length-1)}else if(mode==='new')ch.messages.pop()}
  VC.end(target,c,ch,!err);await saveChat(ch);drawMsgs(false,err);
- if(!err&&S.autoSum&&cur.chat===ch){busy=true;try{await summarize(c0,ch,false)}finally{busy=false}}
  return!err}
 let stopQ=false;
 async function runQueue(ch,list){stopQ=false;let n=0;for(const c of list){if(stopQ||cur.chat!==ch)break;const ok=await generate('new',null,c.id);n++;if(!ok)break}stopQ=false;return n}
@@ -1176,7 +1175,6 @@ function renderSettings(){const B=$('#s-body');B.innerHTML=`<div class="sec" sty
  sec('sec-api','{i:key} Gemini API',`<label>API key (chỉ lưu trong trình duyệt này – localStorage)</label><div class="row" style="flex-wrap:nowrap"><input id="s-key" type="password" autocomplete="off" value="${esc(getKey())}" placeholder="AIza…"><button class="btn-g" id="s-eye">{i:eye}</button></div>
  <label>Model</label><input id="s-model" list="models" value="${esc(S.model)}"><datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"><option value="gemini-2.5-flash-lite"></datalist>
  <div class="g3">${num('temperature','Temperature',S.temperature,'step="0.05" min="0" max="2"')}${num('maxTokens','Token trả lời',S.maxTokens)}${num('topP','Top P',S.topP,'step="0.01" min="0" max="1"')}</div>
- ${sw('s-autoSum',S.autoSum,`{i:brain} Tự động tóm tắt khi chat dài (mỗi ${S.sumEvery} tin cũ, giữ nguyên ${S.sumKeep} tin gần nhất)`)}
  ${sw('s-civic',S.civic,'Gửi cả CIVIC_INTEGRITY=BLOCK_NONE (tự bỏ nếu model báo lỗi)')}`)+
  sec('sec-proxy','{i:globe} Proxy',`<p class="hint" style="margin-top:0">Chọn chat bằng API key hay Proxy ở mục <b>Chế độ kết nối</b> trên cùng. Lưu/chọn một proxy ở đây sẽ chuyển sang chế độ Proxy.</p>
  <label style="margin-top:14px">Cấu hình proxy đã lưu</label><div id="px-list">${proxyListHtml()}</div>
@@ -1247,7 +1245,7 @@ function collectS(){const g=id=>document.getElementById('s-'+id);if(!g('model'))
  const k=g('key').value.trim();k?localStorage.setItem('rp_apikey',k):localStorage.removeItem('rp_apikey');
  for(const f of['model','sysPrompt','source','jailbreak','anDefault','contNudge','impPrompt','stopStrings'])S[f]=g(f).value;
  for(const f of['temperature','maxTokens','topP','scanDepth','loreBudget','imgLimit','topK','minP','repPen','freqPen','presPen','maxContext','anDepth','anFreq','bgDim'])S[f]=Number(g(f).value);
- for(const f of['civic','autoSum','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream','imgDirect'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
+ for(const f of['civic','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream','imgDirect'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
  S.regex=[...document.querySelectorAll('[data-rx]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o});
  S.qr=[...document.querySelectorAll('[data-qr]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o}).filter(q=>q.label.trim()||q.text.trim());
  if(!S.model.trim())S.model=DEF.model;if(!(+S.maxContext>0))S.maxContext=DEF.maxContext;S.userName=P(null)?.name||S.userName}
