@@ -100,6 +100,7 @@ header h1{font-size:17px;font-weight:650;margin:0;flex:1;white-space:nowrap;over
 .mt .ic{width:16px;height:16px}
 .cursor:after{content:"▍";animation:bl 1s infinite;color:var(--acc2)}
 @keyframes bl{50%{opacity:0}}
+.rtry{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:#f0b86e}.rtry .btn-g{padding:3px 10px;font-size:12px}
 .errbox{max-width:820px;margin:0 auto 14px;background:rgba(127,29,29,.25);border:1px solid rgba(248,113,113,.4);color:#fecaca;padding:11px 14px;border-radius:14px;font-size:14px;white-space:pre-wrap}
 .composer{flex-shrink:0;padding:8px 12px;padding-bottom:max(12px,env(safe-area-inset-bottom));position:relative;z-index:3;background:linear-gradient(transparent,rgba(12,10,20,.9) 30%)}
 .composer .in{display:flex;gap:6px;align-items:flex-end;max-width:820px;margin:0 auto;padding:6px;background:rgba(30,25,46,.82);border:1px solid var(--line2);border-radius:28px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 30px -10px #000c;transition:border-color .2s,box-shadow .2s}
@@ -368,7 +369,7 @@ const DEF_CONT='[OOC: Continue your previous reply exactly from where it stopped
 const DEF_IMP="[OOC: For this one message only, write {{user}}'s next message yourself, as {{user}} would write it: same perspective, style and language as {{user}}'s earlier messages, consistent with the story so far. Do not write {{char}}'s reply. Output only {{user}}'s message text.]";
 const DEF_QR=[{label:'OOC',text:'OOC: ',send:false},{label:'Tiếp tục cảnh',text:'*Câu chuyện tiếp diễn.*',send:true},{label:'Mô tả xung quanh',text:'OOC: Hãy mô tả chi tiết khung cảnh xung quanh lúc này.',send:true},{label:'Tung xúc xắc',text:'*Tung xúc xắc: {{roll:1d20}}*',send:false}];
 const DEF={model:'gemini-2.5-flash',temperature:0.9,maxTokens:2048,topP:0.95,topK:0,minP:0,repPen:1,freqPen:0,presPen:0,stopStrings:'',maxContext:120000,userName:'Hoang',persona:'',sysPrompt:DEFAULT_SYS,jailbreak:'',contNudge:DEF_CONT,impPrompt:DEF_IMP,nameStop:true,
- anDefault:'',anDepth:4,anFreq:1,scanDepth:4,loreBudget:4000,wiRecursive:true,wiCase:false,wiWhole:false,imgLimit:4,civic:true,source:'gemini',sumKeep:12,proxyUrl:'',proxyModel:'',
+ anDefault:'',anDepth:4,anFreq:1,scanDepth:4,loreBudget:4000,wiRecursive:true,wiCase:false,wiWhole:false,imgLimit:4,civic:true,source:'gemini',sumKeep:12,retryOn:true,retryMax:0,retryFallback:'',retryFbAfter:3,proxyUrl:'',proxyModel:'',
  personas:null,defPersona:'',regex:[],qr:null,showQr:true,bgImage:'',bgDim:55,accent:'violet'};
 let S=Object.assign({},DEF,JSON.parse(localStorage.getItem('rp_settings')||'{}'));delete S.autoSum;delete S.sumEvery;
 if(!Array.isArray(S.personas)||!S.personas.length){S.personas=[{id:'p_default',name:S.userName||'User',desc:S.persona||'',avatar:''}];S.defPersona='p_default'}
@@ -664,10 +665,10 @@ async function proxyStream(body,onText){const key=getProxyKey(),url=normProxyUrl
  if(!body.model)throw new Error('Chưa nhập tên model cho Proxy ({i:gear} Cài đặt › {i:globe} Proxy).');
  abortCtl=new AbortController();let res;
  try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body),signal:abortCtl.signal})}
- catch(e){if(e.name==='AbortError')throw e;throw new Error('Không kết nối được Proxy ('+e.message+') tại '+url+'.'+(/trycloudflare|ngrok|loca\.lt/i.test(url)?' Link tunnel (trycloudflare…) có thể đã đổi hoặc hết hạn – chạy lại Colab/proxy và dán link mới.':'')+' Cũng có thể Proxy chặn CORS (không cho gọi từ trình duyệt), URL sai, hoặc máy chủ đang tắt.')}
+ catch(e){if(e.name==='AbortError')throw e;throw Object.assign(new Error('Không kết nối được Proxy ('+e.message+') tại '+url+'.'+(/trycloudflare|ngrok|loca\.lt/i.test(url)?' Link tunnel (trycloudflare…) có thể đã đổi hoặc hết hạn – chạy lại Colab/proxy và dán link mới.':'')+' Cũng có thể Proxy chặn CORS (không cho gọi từ trình duyệt), URL sai, hoặc máy chủ đang tắt.'),{net:true})}
  if(!res.ok&&(res.status===400||res.status===422)&&['top_k','min_p','repetition_penalty'].some(k=>k in body)){const t0=await res.text();const b2={...body};for(const k of['top_k','min_p','repetition_penalty'])delete b2[k];
   try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(b2),signal:abortCtl.signal})}catch(e){if(e.name==='AbortError')throw e;throw new Error('Proxy lỗi: '+errMsg(t0))}}
- if(!res.ok){const t=await res.text();throw new Error('Proxy lỗi HTTP '+res.status+(res.statusText?' '+res.statusText:'')+'\n'+errMsg(t))}
+ if(!res.ok){const t=await res.text();throw Object.assign(new Error('Proxy lỗi HTTP '+res.status+(res.statusText?' '+res.statusText:'')+'\n'+errMsg(t)),{status:res.status,delay:retryDelayOf(t,res.headers)})}
  const mapF=f=>({stop:'STOP',length:'MAX_TOKENS',content_filter:'SAFETY'}[f]||f||'');let full='',finish='';
  const ct=res.headers.get('content-type')||'';
  if(!/event-stream/i.test(ct)){const t=await res.text();let j=null;try{j=JSON.parse(t)}catch(e){}
@@ -678,7 +679,7 @@ async function proxyStream(body,onText){const key=getProxyKey(),url=normProxyUrl
   if(j.error)throw new Error('Proxy lỗi: '+(j.error.message||JSON.stringify(j.error)));const c=j.choices?.[0];if(!c)return;
   const t=c.delta?.content??c.message?.content??c.text??'';if(t){full+=t;onText(full)}if(c.finish_reason)finish=mapF(c.finish_reason)}
  const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
- while(true){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf('\n'))>=0){sseLine(buf.slice(0,i));buf=buf.slice(i+1)}}sseLine(buf);
+ while(true){let done,value;try{({done,value}=await rd.read())}catch(e){if(e.name==='AbortError')throw e;throw Object.assign(new Error('Mất kết nối giữa chừng ('+e.message+')'),{net:true})}if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf('\n'))>=0){sseLine(buf.slice(0,i));buf=buf.slice(i+1)}}sseLine(buf);
  return{text:full,finish:finish||'STOP',block:''}}
 let sumBusy=false;
 async function summarize(c,ch,force){if(sumBusy)return false;const keep=+S.sumKeep||12;let start=0;if(ch.summary?.trim()&&ch.sumUpTo){const i=ch.messages.findIndex(m=>m.id===ch.sumUpTo);if(i>=0)start=i+1}
@@ -713,34 +714,61 @@ function modeInfo(){const px=S.source==='proxy';if(px){const p=activeProxy();let
 function updMode(){const i=modeInfo();const c=$('#c-mode');if(c){c.textContent=i.px?'Proxy':'API';c.title='Đang dùng '+i.label+' ('+i.detail+') – bấm để đổi';c.classList.toggle('px',i.px)}
  const box=$('#s-mode');if(box){box.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('on',(b.dataset.mode==='proxy')===i.px));const h=box.querySelector('#s-source');if(h)h.value=i.px?'proxy':'gemini';const d=box.querySelector('.mdet');if(d)d.innerHTML='Đang dùng: <b>'+esc(i.label)+'</b> – '+esc(i.detail)+(i.warn?'<br><span style="color:#f0b86e">'+esc(i.warn)+'</span>':'')}}
 function setMode(m,quiet){S.source=m==='proxy'?'proxy':'gemini';saveS();updMode();if(!quiet){const i=modeInfo();toast((i.px?'Đang chat qua Proxy: ':'Đang chat bằng API key: ')+i.detail+(i.warn?'\n'+i.warn:''),3500)}}
-async function aiStream(req,onText){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b);
+async function aiOnce(req,onText,model){let fn=S.source==='proxy'?b=>proxyStream(req.oai,b):b=>geminiStream(req.body,b,model&&model!==S.model.trim()?{model}:undefined);
  if(S.source==='proxy'&&reqHasImg(req)){const d=imgDirect();if(d){fn=async b=>{try{return await geminiStream(req.body,b,d)}catch(e){if(d.model!==S.model.trim()&&/(^|\D)404(\D|$)|not found/i.test(e.message||''))return geminiStream(req.body,b,{...d,model:S.model.trim()});throw e}};if(!imgNoted++)toast('Tin có ảnh → gửi thẳng tới Gemini API để nhân vật nhìn thấy ảnh')}else if(!imgNoted++)toast('Lưu ý: nhiều proxy (vd. Colab) bỏ qua ảnh. Dán Gemini API key (AIza…) để ảnh được gửi thẳng tới Gemini.')}
  const fin=r=>{if(r&&typeof r.text==='string'){r.raw=r.text;r.text=cleanReply(r.text).replace(/\s+$/,'')}return r};
  if(STREAM()){const r=fin(await fn(t=>onText(cleanReply(t,true))));if(r&&typeof r.text==='string')onText(r.text);return r}
  const r=fin(await fn(()=>{}));if(r.text)onText(r.text);return r}
+
+/* ---------- AUTO RETRY (503/429/5xx/mạng/trả về trống) ---------- */
+const RETRY_CODES=[429,500,502,503,504],HARD_FIN=['SAFETY','PROHIBITED_CONTENT','BLOCKLIST','SPII','IMAGE_SAFETY'];
+function retryDelayOf(t,h){let ms=0;try{const v=h?.get?.('retry-after');if(v)ms=isNaN(+v)?Math.max(0,Date.parse(v)-Date.now()):+v*1000}catch(e){}
+ if(!ms)try{let j=JSON.parse(t);j=Array.isArray(j)?j[0]:j;const d=(j?.error?.details||[]).find(x=>/RetryInfo/.test(x?.['@type']||''));if(d?.retryDelay)ms=parseFloat(d.retryDelay)*1000}catch(e){}
+ return ms>0?Math.min(ms,120000):0}
+function fallbackModels(){return S.source==='proxy'?[]:String(S.retryFallback||'').split(/[,\n]/).map(x=>x.trim()).filter(x=>x&&x!==S.model.trim()).filter((x,i,a)=>a.indexOf(x)===i)}
+function retryReason(e){if(e.empty)return'trả về trống';if(e.net)return'lỗi mạng';return e.status+({429:' quá giới hạn',500:' lỗi máy chủ',502:' lỗi cổng',503:' quá tải',504:' hết thời gian'}[e.status]||'')}
+function retrySleep(ms,last){abortCtl=new AbortController();const sig=abortCtl.signal;return new Promise((ok,no)=>{const t=setTimeout(ok,ms);sig.addEventListener('abort',()=>{clearTimeout(t);no(Object.assign(new DOMException('Đã hủy thử lại','AbortError'),{last}))},{once:true})})}
+async function aiStream(req,onText,opt={}){const on=S.retryOn!==false&&!opt.noRetry,max=Math.max(0,+S.retryMax||0),per=Math.max(1,+S.retryFbAfter||3);
+ const models=[S.model.trim(),...(on?fallbackModels():[])];let n=0,mi=0,fails=0,emp=0;
+ for(;;){let r=null,e0;const model=models[mi];
+  try{r=await aiOnce(req,onText,model);
+   if(!on||(r.text||'').trim()||r.block||HARD_FIN.includes(r.finish)){if(mi&&(r.text||'').trim())toast('Đã trả lời bằng model dự phòng: '+model,3500);opt.onRetry?.(null);return r}
+   e0={empty:true,message:finishNote(r)||'Không có nội dung trả về'};emp++;if(!max&&emp>=5){opt.onRetry?.(null);return r}}
+  catch(e){if(!on||e.name==='AbortError'||!(e.net||RETRY_CODES.includes(e.status)||(mi>0&&e.status===404)))throw e;e0=e}
+  n++;if(max&&n>=max){opt.onRetry?.(null);if(e0.empty)return r;throw e0}
+  fails++;let sw=false;if(models.length>1&&(fails>=per||(mi>0&&e0.status===404))){mi=(mi+1)%models.length;fails=0;sw=true}
+  const wait=e0.delay||Math.min(30000,2000*2**Math.min(n-1,4)*(0.8+Math.random()*0.4));
+  const info={n:n+1,wait,reason:retryReason(e0),model:models[mi],switched:sw,fallback:mi>0,last:String(e0.message||'').split('\n')[0]};
+  if(opt.onRetry)opt.onRetry(info);else toast(`Đang thử lại (lần ${info.n}) sau ${Math.round(wait/1000)}s… · ${info.reason}`+(info.fallback?' · '+info.model:''),Math.min(wait,6000));
+  await retrySleep(wait,e0.message);opt.onRetry?.({...info,wait:0})}}
+function retryUI(target){let tm=0;const clr=()=>{clearInterval(tm);document.querySelectorAll('.rtry').forEach(x=>x.remove())};
+ return{clear:clr,show(i){clearInterval(tm);if(!i)return clr();const box=document.querySelector('.m.last');if(!box)return;let el=box.querySelector('.rtry');
+  if(!el){el=document.createElement('div');el.className='rtry';el.innerHTML='<span></span><button type="button" class="btn-g">Hủy</button>';el.querySelector('button').onclick=()=>abortCtl?.abort();(box.querySelector('.tx')||box).after(el)}
+  const sp=el.querySelector('span'),end=Date.now()+i.wait,tail=` · ${i.reason}`+(i.fallback?` · model dự phòng ${i.model}`:'');
+  const tick=()=>{const left=Math.ceil((end-Date.now())/1000);sp.textContent=left>0?`Đang thử lại (lần ${i.n}) sau ${left}s…${tail}`:`Đang gửi lại (lần ${i.n})…${tail}`;if(left<=0)clearInterval(tm)};tick();if(i.wait)tm=setInterval(tick,500)}}}
 
 /* ---------- GEMINI STREAM ---------- */
 let abortCtl=null;
 function explainErr(status,msg){const m={400:'400 – Yêu cầu không hợp lệ (sai model, tham số hoặc nội dung).',401:'401 – API key không hợp lệ.',403:'403 – API key không có quyền / bị chặn / chưa bật Gemini API.',404:'404 – Không tìm thấy model. Kiểm tra tên model trong Cài đặt.',429:'429 – Vượt giới hạn (quota/rate limit). Đợi một lúc hoặc đổi model.',500:'500 – Lỗi máy chủ Google. Thử lại.',503:'503 – Model quá tải. Thử lại sau.'};return(m[status]||('HTTP '+status))+(msg?'\n'+msg:'')}
 async function geminiStream(body,onText,ov){const key=ov?.key||getKey();if(!key)throw new Error('Chưa có Gemini API key (đang dùng nguồn Gemini API). Vào {i:gear} Cài đặt để dán key, hoặc chuyển sang Proxy.');
  abortCtl=new AbortController();const ns=!STREAM();const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(ov?.model||S.model.trim())}:`+(ns?'generateContent':'streamGenerateContent?alt=sse');
- let res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal});
- const post=()=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal});
+ const post=()=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:abortCtl.signal}).catch(e=>{if(e.name==='AbortError')throw e;throw Object.assign(new Error('Lỗi mạng – không kết nối được Google AI ('+e.message+')'),{net:true})});
+ let res=await post();
  const gc=body.generationConfig||{};const EXTRA=['topK','presencePenalty','frequencyPenalty','stopSequences'];
  for(let tries=0;tries<2&&res.status===400;tries++){const t=await res.text();
   if(S.civic&&/CIVIC/i.test(t)&&body.safetySettings.some(s=>/CIVIC/.test(s.category))){body.safetySettings=body.safetySettings.filter(s=>!/CIVIC/.test(s.category));res=await post();continue}
   if(EXTRA.some(k=>k in gc)){for(const k of['presencePenalty','frequencyPenalty','topK'])delete gc[k];if(/stop/i.test(t))delete gc.stopSequences;res=await post();continue}
-  throw new Error(explainErr(400,errMsg(t)))}
- if(!res.ok){throw new Error(explainErr(res.status,errMsg(await res.text())))}
+  throw Object.assign(new Error(explainErr(400,errMsg(t))),{status:400})}
+ if(!res.ok){const t=await res.text();throw Object.assign(new Error(explainErr(res.status,errMsg(t))),{status:res.status,delay:retryDelayOf(t,res.headers)})}
  let buf='',full='',finish='',block='';
  const handle=line=>{line=line.trim();if(!line.startsWith('data:'))return;const js=line.slice(5).trim();if(!js||js==='[DONE]')return;let j;try{j=JSON.parse(js)}catch(e){return}hObj(j)};
- const hObj=j=>{if(j.error)throw new Error(explainErr(j.error.code,j.error.message));if(j.promptFeedback?.blockReason)block=j.promptFeedback.blockReason;
+ const hObj=j=>{if(j.error)throw Object.assign(new Error(explainErr(j.error.code,j.error.message)),{status:+j.error.code||0,delay:retryDelayOf(JSON.stringify(j))});if(j.promptFeedback?.blockReason)block=j.promptFeedback.blockReason;
   const c=j.candidates?.[0];if(c){const t=(c.content?.parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');if(t){full+=t;onText(full)}if(c.finishReason)finish=c.finishReason}};
  const ct=res.headers.get('content-type')||'';
  if(ns||!/event-stream/i.test(ct)){const t=await res.text();let j=null;try{j=JSON.parse(t)}catch(e){}
   if(j){for(const o of[].concat(j))hObj(o);return{text:full,finish,block}}for(const line of t.split('\n'))handle(line);return{text:full,finish,block}}
  const rd=res.body.getReader(),dec=new TextDecoder();
- while(true){const{done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf('\n'))>=0){handle(buf.slice(0,i));buf=buf.slice(i+1)}}handle(buf);
+ while(true){let done,value;try{({done,value}=await rd.read())}catch(e){if(e.name==='AbortError')throw e;throw Object.assign(new Error('Mất kết nối giữa chừng ('+e.message+')'),{net:true})}if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf('\n'))>=0){handle(buf.slice(0,i));buf=buf.slice(i+1)}}handle(buf);
  return{text:full,finish,block}}
 function errMsg(t){try{return JSON.parse(t).error?.message||t}catch(e){return String(t).slice(0,400)}}
 function finishNote(r){if(r.block)return`{i:ban} Prompt bị chặn bởi bộ lọc (${r.block}). Thử sửa tin nhắn hoặc nội dung lore/nhân vật.`;
@@ -1047,13 +1075,13 @@ async function generate(mode,errNote,speakerId){const{char:c0,chat:ch}=cur;if(bu
  if(mode==='swipe'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return toast('Đây là lời mở đầu của nhóm – bấm Sửa để đổi');c=msgChar(target,ch,c0);history=ch.messages.slice(0,-1);target.swipes.push('');target.sw=target.swipes.length-1}
  else if(mode==='cont'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return;c=msgChar(target,ch,c0);history=ch.messages.slice();extra=S.contNudge||DEF_CONT}
  else{c=speakerId?CH.find(x=>x.id===speakerId):(isGroup(ch)?pickSpeaker(ch,msgText(ch.messages[ch.messages.length-1]||{swipes:['']})):c0);c=c||c0;history=ch.messages.slice();target={id:uid(),role:'model',charId:c.id,swipes:[''],sw:0,t:Date.now()};ch.messages.push(target)}
- const base=mode==='cont'?msgText(target):'';busy=true;target.streaming=true;target.note='';drawMsgs(false);let err='',hit=false;VC.start(target,c,ch,mode);
+ const base=mode==='cont'?msgText(target):'';busy=true;target.streaming=true;target.note='';drawMsgs(false);let err='',hit=false;VC.start(target,c,ch,mode);const RU=retryUI(target);
  try{const req=buildRequest(c,ch,history,extra);let lastDraw=0,raf=0;
   const put=t=>{if(isGroup(ch)&&mode!=='cont')t=t.replace(new RegExp('^\\s*'+reEsc(c.name)+'\\s*:\\s*'),'');target.swipes[target.sw]=base+(mode==='cont'&&base&&t&&!/^\s/.test(t)?' ':'')+t};
-  const r=await aiStream(req,t=>{const k=cutStop(t,req.stops);if(k!=null){t=k;if(!hit){hit=true;abortCtl?.abort()}}put(t);VC.feed(target,c,ch);if(!raf&&performance.now()-lastDraw>100)raf=requestAnimationFrame(()=>{raf=0;lastDraw=performance.now();const el=document.querySelector('.m.last .tx');if(el){el.innerHTML=render(shown(target,c,ch));scrollDown()}})});if(raf){cancelAnimationFrame(raf);raf=0}
+  const r=await aiStream(req,t=>{if(t)RU.clear();const k=cutStop(t,req.stops);if(k!=null){t=k;if(!hit){hit=true;abortCtl?.abort()}}put(t);VC.feed(target,c,ch);if(!raf&&performance.now()-lastDraw>100)raf=requestAnimationFrame(()=>{raf=0;lastDraw=performance.now();const el=document.querySelector('.m.last .tx');if(el){el.innerHTML=render(shown(target,c,ch));scrollDown()}})},{onRetry:i=>{if(i&&i.wait&&msgText(target)!==base){if(raf){cancelAnimationFrame(raf);raf=0}put('');VC.stop();VC.start(target,c,ch,'new');const el=document.querySelector('.m.last .tx');if(el)el.innerHTML=render(shown(target,c,ch))}RU.show(i)}});RU.clear();if(raf){cancelAnimationFrame(raf);raf=0}
   target.note=finishNote(r);if(!(r.text||'').trim()&&mode!=='cont'){err=(r.raw&&r.raw.trim())||!target.note?'{i:close} Model trả về trống (chỉ có thẻ, không có lời thoại), bấm Tạo lại.':target.note;target.note=''}}
- catch(e){if(e.name==='AbortError'){target.note=hit?'':'{i:stop} Đã dừng.'}else err='{i:close} '+e.message}
- busy=false;target.streaming=false;abortCtl=null;target.swipes[target.sw]=applyRegex(msgText(target).replace(/\s+$/,''),'ai','edit');
+ catch(e){if(e.name==='AbortError'){if(e.last&&!(msgText(target)||'').replace(base,'').trim())err='{i:close} '+e.last+'\n(Đã hủy tự thử lại – bấm Tạo lại để thử tiếp.)';else target.note=hit?'':'{i:stop} Đã dừng.'}else err='{i:close} '+e.message}
+ RU.clear();busy=false;target.streaming=false;abortCtl=null;target.swipes[target.sw]=applyRegex(msgText(target).replace(/\s+$/,''),'ai','edit');
  if(err&&!msgText(target)){if(mode==='swipe'){target.swipes.pop();target.sw=Math.max(0,target.swipes.length-1)}else if(mode==='new')ch.messages.pop()}
  VC.end(target,c,ch,!err);await saveChat(ch);drawMsgs(false,err);
  return!err}
@@ -1175,7 +1203,11 @@ function renderSettings(){const B=$('#s-body');B.innerHTML=`<div class="sec" sty
  sec('sec-api','{i:key} Gemini API',`<label>API key (chỉ lưu trong trình duyệt này – localStorage)</label><div class="row" style="flex-wrap:nowrap"><input id="s-key" type="password" autocomplete="off" value="${esc(getKey())}" placeholder="AIza…"><button class="btn-g" id="s-eye">{i:eye}</button></div>
  <label>Model</label><input id="s-model" list="models" value="${esc(S.model)}"><datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"><option value="gemini-2.5-flash-lite"></datalist>
  <div class="g3">${num('temperature','Temperature',S.temperature,'step="0.05" min="0" max="2"')}${num('maxTokens','Token trả lời',S.maxTokens)}${num('topP','Top P',S.topP,'step="0.01" min="0" max="1"')}</div>
- ${sw('s-civic',S.civic,'Gửi cả CIVIC_INTEGRITY=BLOCK_NONE (tự bỏ nếu model báo lỗi)')}`)+
+ ${sw('s-civic',S.civic,'Gửi cả CIVIC_INTEGRITY=BLOCK_NONE (tự bỏ nếu model báo lỗi)')}
+ ${sw('s-retryOn',S.retryOn!==false,'Tự động thử lại khi lỗi 503 quá tải / 429 / 500 / lỗi mạng / trả về trống (chờ 2s, 4s, 8s… tối đa 30s)')}
+ <div class="g3">${num('retryMax','Số lần thử tối đa (0 = đến khi được)',S.retryMax??0,'min="0" step="1"')}${num('retryFbAfter','Đổi model dự phòng sau … lần lỗi',S.retryFbAfter??3,'min="1" step="1"')}</div>
+ <label>Model dự phòng (cách nhau dấu phẩy, thử lần lượt – để trống nếu không dùng)</label><div class="row" style="flex-wrap:nowrap"><input id="s-retryFallback" list="models" value="${esc(S.retryFallback||'')}" placeholder="vd: gemini-2.5-flash-lite, gemini-2.0-flash" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn-g" id="s-fbsug" type="button">Gợi ý</button></div>
+ <p class="mut" style="margin-top:6px">Chỉ dùng khi chat bằng API key. Bấm Gợi ý để điền các model Gemini còn lại trong danh sách (khác model chính). Lỗi 400/401/403 và nội dung bị chặn sẽ không thử lại.</p>`)+
  sec('sec-proxy','{i:globe} Proxy',`<p class="hint" style="margin-top:0">Chọn chat bằng API key hay Proxy ở mục <b>Chế độ kết nối</b> trên cùng. Lưu/chọn một proxy ở đây sẽ chuyển sang chế độ Proxy.</p>
  <label style="margin-top:14px">Cấu hình proxy đã lưu</label><div id="px-list">${proxyListHtml()}</div>
  <button class="btn-g" id="px-add" style="width:100%;margin-top:4px">{i:plus} Thêm proxy</button>
@@ -1211,6 +1243,7 @@ Trong tin bạn gửi, macro (vd xúc xắc) được tính ngay lúc gửi.</p>
  <label>Độ tối lớp phủ ảnh nền: <b id="s-bgdv">${S.bgDim}%</b></label><input type="range" id="s-bgDim" min="0" max="95" value="${S.bgDim}">`)+
  sec('sec-data','{i:save} Dữ liệu',`<p class="mut">Lưu trữ: ${DB.mem?'localStorage (dự phòng)':'IndexedDB'} · ${CH.length} nhân vật · ${LB.length} lorebook · ${CT.length} chat · ${GR.length} nhóm</p><div class="row"><button class="btn-g" id="s-exp">{i:download} Sao lưu tất cả (JSON)</button><button class="btn-g" id="s-imp">{i:upload} Khôi phục từ file</button><button class="btn-d" id="s-wipe">Xóa toàn bộ</button></div><p class="mut">File sao lưu gồm nhân vật, lorebook, chat (kèm ảnh), persona, regex, cài đặt – KHÔNG gồm API key hay Proxy key.</p>`);
  VC.wire();$('#s-acc').onclick=()=>showAccount();B.querySelectorAll('details.sec').forEach(d=>d.ontoggle=()=>d.open?openSecs.add(d.id):openSecs.delete(d.id));
+ {const fb=$('#s-fbsug');if(fb)fb.onclick=()=>{const m=($('#s-model').value||'').trim();$('#s-retryFallback').value=[...document.querySelectorAll('#models option')].map(o=>o.value).filter(v=>v&&v!==m&&(/pro/.test(m)||!/pro/.test(v))).sort((x,y)=>/lite/.test(y)-/lite/.test(x)).join(', ')}}
  $('#s-eye').onclick=()=>{const k=$('#s-key');k.type=k.type==='password'?'text':'password'};wireProxyList();B.querySelectorAll('#s-mode [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));updMode();
  $('#s-reset').onclick=()=>{$('#s-sysPrompt').value=DEFAULT_SYS};
  const rer=()=>{collectS();saveS();renderSettings()};
@@ -1243,9 +1276,9 @@ function editPersona(p){const isNew=!p;p=p?{...p}:{id:'p_'+uid(),name:'',desc:''
 async function wipe(){for(const s of['chars','lore','chats','groups'])for(const x of await DB.all(s))await DB.del(s,x.id)}
 function collectS(){const g=id=>document.getElementById('s-'+id);if(!g('model'))return;VC.collect();
  const k=g('key').value.trim();k?localStorage.setItem('rp_apikey',k):localStorage.removeItem('rp_apikey');
- for(const f of['model','sysPrompt','source','jailbreak','anDefault','contNudge','impPrompt','stopStrings'])S[f]=g(f).value;
- for(const f of['temperature','maxTokens','topP','scanDepth','loreBudget','imgLimit','topK','minP','repPen','freqPen','presPen','maxContext','anDepth','anFreq','bgDim'])S[f]=Number(g(f).value);
- for(const f of['civic','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream','imgDirect'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
+ for(const f of['model','retryFallback','sysPrompt','source','jailbreak','anDefault','contNudge','impPrompt','stopStrings'])S[f]=g(f).value;
+ for(const f of['temperature','maxTokens','topP','scanDepth','loreBudget','imgLimit','topK','minP','repPen','freqPen','presPen','maxContext','anDepth','anFreq','bgDim'])S[f]=Number(g(f).value);for(const f of['retryMax','retryFbAfter'])if(g(f))S[f]=Math.max(f==='retryMax'?0:1,Math.floor(+g(f).value||0));
+ for(const f of['civic','retryOn','nameStop','wiRecursive','wiCase','wiWhole','showQr','lite','stream','imgDirect'])if(g(f))S[f]=g(f).checked;document.body.classList.toggle('lite',S.lite!==false);
  S.regex=[...document.querySelectorAll('[data-rx]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o});
  S.qr=[...document.querySelectorAll('[data-qr]')].map(r=>{const o={};r.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.type==='checkbox'?x.checked:x.value);return o}).filter(q=>q.label.trim()||q.text.trim());
  if(!S.model.trim())S.model=DEF.model;if(!(+S.maxContext>0))S.maxContext=DEF.maxContext;S.userName=P(null)?.name||S.userName}
