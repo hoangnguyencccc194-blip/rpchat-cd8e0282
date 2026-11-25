@@ -102,7 +102,6 @@ header h1{font-size:17px;font-weight:650;margin:0;flex:1;white-space:nowrap;over
 @keyframes bl{50%{opacity:0}}
 .rtry{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:#f0b86e}.rtry .btn-g{padding:3px 10px;font-size:12px}
 .errbox{max-width:820px;margin:0 auto 14px;background:rgba(127,29,29,.25);border:1px solid rgba(248,113,113,.4);color:#fecaca;padding:11px 14px;border-radius:14px;font-size:14px;white-space:pre-wrap}
-.bub .errd{font-size:12px;line-height:1.45;margin-top:8px;white-space:pre-wrap;opacity:.8}
 .composer{flex-shrink:0;padding:8px 12px;padding-bottom:max(12px,env(safe-area-inset-bottom));position:relative;z-index:3;background:linear-gradient(transparent,rgba(12,10,20,.9) 30%)}
 .composer .in{display:flex;gap:6px;align-items:flex-end;max-width:820px;margin:0 auto;padding:6px;background:rgba(30,25,46,.82);border:1px solid var(--line2);border-radius:28px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 30px -10px #000c;transition:border-color .2s,box-shadow .2s}
 .composer .in:focus-within{border-color:rgba(217,70,239,.55);box-shadow:0 0 0 3px rgba(217,70,239,.12),0 10px 30px -10px #000c}
@@ -578,20 +577,9 @@ function activateLore(books,recentTexts,budgetTokens=S.loreBudget,rand=Math.rand
 function msgText(m){return m.swipes[m.sw]||''}
 function isErrMsg(m){return!!(m&&m.errOf&&m.errOf[m.sw])}
 function stripIco(s){return String(s||'').replace(/\{i:[a-z-]+\}\s*/g,'').trim()}
-function isSafetyErr(s){return /PROHIBITED_CONTENT|BLOCKLIST|IMAGE_SAFETY|\bSPII\b|Block Reason|promptFeedback|\bSAFETY\b|bị chặn|bộ lọc/i.test(String(s||''))}
-function genErrMsg(err){const raw=stripIco(err);if(isSafetyErr(raw))return{kind:'safety',text:'*(Google đã chặn lượt trả lời này. Bạn thử sửa ý, chuyển hướng cảnh hoặc bấm Tạo lại nhé.)*',detail:''};
- let head='Không tạo được câu trả lời. Bấm Tạo lại để thử tiếp nhé.';
- if(/429|quota|rate.?limit|RESOURCE_EXHAUSTED|quá giới hạn|vượt giới hạn/i.test(raw))head='Hết lượt hoặc đang bị giới hạn. Thử lại sau một lúc nhé.';
- else if(/503|UNAVAILABLE|overloaded|quá tải/i.test(raw))head='Model đang quá tải. Thử lại sau nhé.';
- else if(/401|403|API key|không hợp lệ|không có quyền/i.test(raw))head='API key hoặc quyền truy cập có vấn đề. Kiểm tra lại trong Cài đặt nhé.';
- else if(/404|không tìm thấy model|not.?found/i.test(raw))head='Không tìm thấy model. Kiểm tra tên model trong Cài đặt nhé.';
- else if(/network|lỗi mạng|mất kết nối|timed? ?out|DEADLINE|error connecting/i.test(raw))head='Mất kết nối. Kiểm tra mạng rồi bấm Tạo lại nhé.';
- else if(/trả về trống|no content|empty|chỉ có thẻ/i.test(raw))head='Model không trả về lời thoại. Bấm Tạo lại để thử tiếp nhé.';
- else if(/hủy tự thử lại|Đã hủy/i.test(raw))head='Đã hủy tự thử lại. Bấm Tạo lại để thử tiếp nhé.';
- return{kind:'other',text:'*('+head+')*',detail:raw}}
-function errView(m){const e=m&&m.errOf&&m.errOf[m.sw];if(!e)return null;return(typeof e==='object'&&e.text)?e:genErrMsg(e)}
-function bubbleText(m,c,ch){const ev=errView(m),t=shown(m,c,ch);return ev?(t?t.replace(/\s+$/,'')+'\n\n':'')+ev.text:t}
-function listPreview(m){const t=msgText(m).trim();if(t)return t;const ev=errView(m);return ev?ev.text.replace(/^\*\(|\)\*$/g,''):''}
+function errText(m){const e=m&&m.errOf&&m.errOf[m.sw];if(!e)return'';return stripIco(typeof e==='string'?e:(e.detail||e.text||''))}
+function bubbleHtml(m,c,ch){const t=shown(m,c,ch),e=errText(m);return(t?render(t):'')+(t&&e?'<br><br>':'')+(e?esc(e).replace(/\n/g,'<br>'):'')}
+function listPreview(m){const t=msgText(m).trim();return t||errText(m)}
 const isGroup=ch=>!!ch&&((ch.members?.length||0)>1||!!ch.groupId);
 const PLACE='(tạo cốt truyện của bạn)';
 const gOf=ch=>ch?.groupId?GR.find(g=>g.id===ch.groupId)||null:null;
@@ -1052,12 +1040,12 @@ function scrollDown(force){if(force)stick=true;if(stick){pin();requestAnimationF
  const vv=()=>{if(stick){pin();requestAnimationFrame(()=>{if(stick)pin()})}};window.visualViewport?.addEventListener('resize',vv);addEventListener('resize',vv)})();
 const shown=(m,c,ch)=>applyRegex(fill(msgText(m),c,ch),m.role==='user'?'user':'ai','display');
 const MSG_WIN=40;
-function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');const n=ch.messages.length;const per=P(ch);let from=Math.max(0,n-(cur.win||MSG_WIN));if(!stick&&!force&&cur.from!=null)from=Math.min(from,cur.from,Math.max(0,n-1));cur.from=from;if(force)stick=true;
+function drawMsgs(force){const{char:c0,chat:ch}=cur;const B=$('#msgs');const n=ch.messages.length;const per=P(ch);let from=Math.max(0,n-(cur.win||MSG_WIN));if(!stick&&!force&&cur.from!=null)from=Math.min(from,cur.from,Math.max(0,n-1));cur.from=from;if(force)stick=true;
  const gg=gOf(ch);B.innerHTML=(from>0?`<button class="btn-g" id="c-older">{i:chevron-down} Xem ${from} tin cũ hơn</button>`:'')+ch.messages.slice(from).map((m,i0)=>{const i=i0+from;const u=m.role==='user';const c=u?c0:msgChar(m,ch,c0);const nar=!!m.narrator;
   const ck=m.ckpt?CT.find(x=>x.id===m.ckpt.id):null;
   return`<div class="m ${u?'u':''} ${i===n-1?'last':''}" data-i="${i}"><div class="av ${u&&per?.avatar?'pav':''}" style="${u?(per?.avatar?`--pav:url('${per.avatar}')`:''):`background-image:url('${nar?(gAv(gg)||c.avatar):c.avatar}')${nar?';border-radius:12px':''}`}"></div><div class="bub"><div class="who">${esc(u?per?.name||'User':nar?(gg?.name||'Mở đầu')+' · mở đầu':c.name)}</div>
-  ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${render(bubbleText(m,c,ch))}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
-  ${errView(m)?.detail?`<div class="mut errd">${esc(errView(m).detail)}</div>`:''}${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
+  ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${bubbleHtml(m,c,ch)}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
+  ${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
   <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button>`+(isErrMsg(m)&&!msgText(m)?'':`<button data-a="cont" title="Tiếp tục">{i:forward}</button>`):''}${!u&&!(!isErrMsg(m)?0:!msgText(m))?`<button data-a="tts" title="Đọc to">{i:volume}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
  const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),f=B.querySelector('.m'),id=f?.dataset.i,y0=f?f.getBoundingClientRect().top:0;stick=false;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);const fix=()=>{const e=id!=null&&B.querySelector(`.m[data-i="${id}"]`);if(e)sc.scrollTop+=e.getBoundingClientRect().top-y0};fix();requestAnimationFrame(()=>{fix();setTimeout(fix,250)})};
  B.querySelectorAll('.bub img').forEach(im=>im.onclick=()=>{const v=$('#imgview');v.querySelector('img').src=im.src;v.style.display='flex';const done=NAV.overlay(()=>{v.style.display='none'});v.onclick=()=>{v.style.display='none';done&&done()}});
