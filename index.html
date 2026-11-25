@@ -102,6 +102,7 @@ header h1{font-size:17px;font-weight:650;margin:0;flex:1;white-space:nowrap;over
 @keyframes bl{50%{opacity:0}}
 .rtry{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:#f0b86e}.rtry .btn-g{padding:3px 10px;font-size:12px}
 .errbox{max-width:820px;margin:0 auto 14px;background:rgba(127,29,29,.25);border:1px solid rgba(248,113,113,.4);color:#fecaca;padding:11px 14px;border-radius:14px;font-size:14px;white-space:pre-wrap}
+.bub .errd{font-size:12px;line-height:1.45;margin-top:8px;white-space:pre-wrap;opacity:.8}
 .composer{flex-shrink:0;padding:8px 12px;padding-bottom:max(12px,env(safe-area-inset-bottom));position:relative;z-index:3;background:linear-gradient(transparent,rgba(12,10,20,.9) 30%)}
 .composer .in{display:flex;gap:6px;align-items:flex-end;max-width:820px;margin:0 auto;padding:6px;background:rgba(30,25,46,.82);border:1px solid var(--line2);border-radius:28px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 30px -10px #000c;transition:border-color .2s,box-shadow .2s}
 .composer .in:focus-within{border-color:rgba(217,70,239,.55);box-shadow:0 0 0 3px rgba(217,70,239,.12),0 10px 30px -10px #000c}
@@ -417,7 +418,7 @@ function roll(spec){const m=/^\s*(\d*)d(\d+)\s*([+-]\s*\d+)?\s*$/i.exec(spec)||/
 /* Macro engine (SillyTavern-compatible subset). ctx:{char,chat,dry,members,input} */
 function macros(t,ctx={}){t=String(t??'');if(!t.includes('{{'))return t;const{char,chat}=ctx;const msgs=chat?.messages||[];const now=new Date();
  const V=chat?(chat.vars||(chat.vars={})):{},G=gvars();let gDirty=false;const args=s=>s.includes('::')?s.split('::'):null;let off=0;
- const lastBy=f=>{for(let i=msgs.length-1;i>=0;i--)if(f(msgs[i]))return msgText(msgs[i]);return''};
+ const lastBy=f=>{for(let i=msgs.length-1;i>=0;i--)if(!isErrMsg(msgs[i])&&f(msgs[i]))return msgText(msgs[i]);return''};
  const H=(inner)=>{const raw=inner;const s=inner.trim();if(s.startsWith('//'))return'';const a=args(s);const name=(a?a[0]:s.split(':')[0]).trim().toLowerCase();
   const rest=a?a.slice(1):(s.includes(':')?[s.slice(s.indexOf(':')+1)]:[]);
   switch(name){
@@ -575,6 +576,22 @@ function activateLore(books,recentTexts,budgetTokens=S.loreBudget,rand=Math.rand
  out.sort((a,b)=>a.e.order-b.e.order);const entries=out.map(it=>it.e);return{entries,chars:used,total,sticky:stickyHit.size}}
 /* ---------- PROMPT ---------- */
 function msgText(m){return m.swipes[m.sw]||''}
+function isErrMsg(m){return!!(m&&m.errOf&&m.errOf[m.sw])}
+function stripIco(s){return String(s||'').replace(/\{i:[a-z-]+\}\s*/g,'').trim()}
+function isSafetyErr(s){return /PROHIBITED_CONTENT|BLOCKLIST|IMAGE_SAFETY|\bSPII\b|Block Reason|promptFeedback|\bSAFETY\b|bị chặn|bộ lọc/i.test(String(s||''))}
+function genErrMsg(err){const raw=stripIco(err);if(isSafetyErr(raw))return{kind:'safety',text:'*(Google đã chặn lượt trả lời này. Bạn thử sửa ý, chuyển hướng cảnh hoặc bấm Tạo lại nhé.)*',detail:''};
+ let head='Không tạo được câu trả lời. Bấm Tạo lại để thử tiếp nhé.';
+ if(/429|quota|rate.?limit|RESOURCE_EXHAUSTED|quá giới hạn|vượt giới hạn/i.test(raw))head='Hết lượt hoặc đang bị giới hạn. Thử lại sau một lúc nhé.';
+ else if(/503|UNAVAILABLE|overloaded|quá tải/i.test(raw))head='Model đang quá tải. Thử lại sau nhé.';
+ else if(/401|403|API key|không hợp lệ|không có quyền/i.test(raw))head='API key hoặc quyền truy cập có vấn đề. Kiểm tra lại trong Cài đặt nhé.';
+ else if(/404|không tìm thấy model|not.?found/i.test(raw))head='Không tìm thấy model. Kiểm tra tên model trong Cài đặt nhé.';
+ else if(/network|lỗi mạng|mất kết nối|timed? ?out|DEADLINE|error connecting/i.test(raw))head='Mất kết nối. Kiểm tra mạng rồi bấm Tạo lại nhé.';
+ else if(/trả về trống|no content|empty|chỉ có thẻ/i.test(raw))head='Model không trả về lời thoại. Bấm Tạo lại để thử tiếp nhé.';
+ else if(/hủy tự thử lại|Đã hủy/i.test(raw))head='Đã hủy tự thử lại. Bấm Tạo lại để thử tiếp nhé.';
+ return{kind:'other',text:'*('+head+')*',detail:raw}}
+function errView(m){const e=m&&m.errOf&&m.errOf[m.sw];if(!e)return null;return(typeof e==='object'&&e.text)?e:genErrMsg(e)}
+function bubbleText(m,c,ch){const ev=errView(m),t=shown(m,c,ch);return ev?(t?t.replace(/\s+$/,'')+'\n\n':'')+ev.text:t}
+function listPreview(m){const t=msgText(m).trim();if(t)return t;const ev=errView(m);return ev?ev.text.replace(/^\*\(|\)\*$/g,''):''}
 const isGroup=ch=>!!ch&&((ch.members?.length||0)>1||!!ch.groupId);
 const PLACE='(tạo cốt truyện của bạn)';
 const gOf=ch=>ch?.groupId?GR.find(g=>g.id===ch.groupId)||null:null;
@@ -612,7 +629,7 @@ function sumCut(chat,msgs){if(!chat?.summary?.trim()||!chat.sumUpTo)return msgs;
 function dataUrlPart(u){const m=/^data:([^;]+);base64,(.*)$/s.exec(u);return m?{inlineData:{mimeType:m[1],data:m[2]}}:null}
 const IMG_TURNS=2;/* only the newest 2 user turns carry image data; older images become a short note so every request stays small */
 function rawContents(char,msgs,imgLimit=S.imgLimit,ctx={}){let left=imgLimit,uTurn=0;const raw=[];const chat=ctx.chat;const grp=isGroup(chat);
- for(let i=msgs.length-1;i>=0;i--){const m=msgs[i];const parts=[];if(m.hidden)continue;
+ for(let i=msgs.length-1;i>=0;i--){const m=msgs[i];const parts=[];if(m.hidden||isErrMsg(m))continue;
   if(m.greeting&&msgText(m).trim()===PLACE)continue;
   if(m.narrator){const nt=msgText(m).trim();if(nt)raw.unshift({role:'user',parts:[{text:'[Opening scene] '+macros(nt,{char,chat,dry:true,members:ctx.members})}]});continue}
   if(m.role==='user')uTurn++;
@@ -631,7 +648,7 @@ function stopList(char,chat,mode){const X=t=>macros(t,{char,chat,dry:true});cons
  if(S.nameStop){L.unshift('\n'+uName(chat)+':');if(isGroup(chat))for(const o of members(chat))if(o.id!==char.id)L.push('\n'+o.name+':')}return[...new Set(L)]}
 function cutStop(t,stops){let k=-1;for(const s of stops){const i=t.indexOf(s);if(i>=0&&(k<0||i<k))k=i}return k>=0?t.slice(0,k):null}
 function buildRequest(char,chat,msgs,extraUser,opts={}){const all=msgs;msgs=sumCut(chat,msgs);const mem=chat?members(chat):[char];if(!mem.includes(char))mem.unshift(char);const dry=!!opts.dry;
- const lore=activateLore(booksFor(chat?mem:[char]),msgs.slice(-S.scanDepth).map(m=>applyRegex(msgText(m),m.role==='user'?'user':'ai','prompt')),S.loreBudget,opts.rand||Math.random,{chat,dry,turn:all.length});
+ const lore=activateLore(booksFor(chat?mem:[char]),msgs.slice(-S.scanDepth).filter(m=>!isErrMsg(m)).map(m=>applyRegex(msgText(m),m.role==='user'?'user':'ai','prompt')),S.loreBudget,opts.rand||Math.random,{chat,dry,turn:all.length});
  const X=t=>macros(t,{char,chat,dry,members:mem});
  let raw=rawContents(char,msgs,S.imgLimit,{chat,members:mem});const system=buildSystem(char,chat,lore,{dry,members:mem});
  /* depth injections: author's note, WI @depth, character depth prompt */
@@ -683,7 +700,7 @@ async function proxyStream(body,onText){const key=getProxyKey(),url=normProxyUrl
  return{text:full,finish:finish||'STOP',block:''}}
 let sumBusy=false;
 async function summarize(c,ch,force){if(sumBusy)return false;const keep=+S.sumKeep||12;let start=0;if(ch.summary?.trim()&&ch.sumUpTo){const i=ch.messages.findIndex(m=>m.id===ch.sumUpTo);if(i>=0)start=i+1}
- const end=ch.messages.length-keep;const part=ch.messages.slice(start,Math.max(start,end)).filter(m=>!m.streaming);
+ const end=ch.messages.length-keep;const part=ch.messages.slice(start,Math.max(start,end)).filter(m=>!m.streaming&&!isErrMsg(m));
  if(!part.length){if(force)toast('Chưa đủ tin nhắn cũ để tóm tắt (giữ nguyên '+keep+' tin gần nhất).');return false}
  if(!force&&part.length<(+S.sumEvery||20))return false;
  const log=part.map(m=>(m.role==='user'?uName(ch):msgChar(m,ch,c).name)+': '+fill(msgText(m),c,ch)).join('\n\n');
@@ -852,7 +869,7 @@ function renderHome(){document.querySelectorAll('.tabs button[data-t]').forEach(
   B.innerHTML=`<div class="row" style="margin-bottom:12px"><button class="btn-p" id="g-new" ${CH.length<2?'disabled':''}>{i:plus} Tạo nhóm chat</button><button class="btn-g" id="g-imp">{i:upload} Nhập nhóm (JSON)</button></div>`+(GR.length?`<div class="list">${GR.map(g=>{const n=CT.filter(x=>x.groupId===g.id).length;return`<div class="it" data-gid="${g.id}"><div class="av" style="width:52px;height:52px;border-radius:16px;background-image:url('${gAv(g)}')"></div><div class="t"><b>${esc(g.name)}</b><small>${esc(gMembers(g).map(c=>c.name).join(', '))}</small><small>${MN[g.mode||'auto']} · ${n} chat</small></div></div>`}).join('')}</div>`:'<div class="empty">Chưa có nhóm nào.<br>Tạo nhóm từ 2 nhân vật trở lên để họ cùng nhập vai với bạn.</div>');
   $('#g-new').onclick=()=>editGroup(null);$('#g-imp').onclick=importGroup;B.querySelectorAll('[data-gid]').forEach(e=>e.onclick=()=>openGroup(e.dataset.gid))}
  else if(homeTab==='recent'){fab.style.display='none';const l=[...CT].sort((a,b)=>b.updated-a.updated);
-  B.innerHTML=l.length?`<div class="list">${l.map(c=>{const ch=CH.find(x=>x.id===c.charId);const g=gOf(c);const last=c.messages[c.messages.length-1];return`<div class="it" data-id="${c.id}"><div class="av" style="background-image:url('${(g&&gAv(g))||ch?.avatar||''}')${g?';border-radius:12px':''}"></div><div class="t"><b>${isGroup(c)?'{i:users} ':''}${esc(g?g.name+' · '+c.title.replace(g.name+' – ',''):c.title)}</b><small>${esc(members(c).map(x=>x.name).join(', ')||'?')} · ${new Date(c.updated).toLocaleString('vi')}</small><small>${esc(last?msgText(last).slice(0,80):'')}</small></div></div>`}).join('')}</div>`:'<div class="empty">Chưa có cuộc chat nào.</div>';
+  B.innerHTML=l.length?`<div class="list">${l.map(c=>{const ch=CH.find(x=>x.id===c.charId);const g=gOf(c);const last=c.messages[c.messages.length-1];return`<div class="it" data-id="${c.id}"><div class="av" style="background-image:url('${(g&&gAv(g))||ch?.avatar||''}')${g?';border-radius:12px':''}"></div><div class="t"><b>${isGroup(c)?'{i:users} ':''}${esc(g?g.name+' · '+c.title.replace(g.name+' – ',''):c.title)}</b><small>${esc(members(c).map(x=>x.name).join(', ')||'?')} · ${new Date(c.updated).toLocaleString('vi')}</small><small>${esc(last?listPreview(last).slice(0,80):'')}</small></div></div>`}).join('')}</div>`:'<div class="empty">Chưa có cuộc chat nào.</div>';
   B.querySelectorAll('.it').forEach(e=>e.onclick=()=>openChat(e.dataset.id))}
  else{fab.style.display='';fab.onclick=()=>importLore();
   B.innerHTML=`<div class="row" style="margin-bottom:12px"><button class="btn-p" id="li">{i:upload} Nhập lorebook (World Info JSON)</button><button class="btn-g" id="ln">{i:plus} Lorebook trống</button></div>`+(LB.length?`<div class="list">${LB.map(l=>`<div class="it" data-id="${l.id}"><div class="av" style="display:flex;align-items:center;justify-content:center">{i:book}</div><div class="t"><b>${esc(l.name)}</b><small>${l.entries.length} mục · gắn với: ${esc(CH.filter(c=>c.lorebooks.includes(l.id)).map(c=>c.name).join(', ')||'—')}</small></div></div>`).join('')}</div>`:'<div class="empty">Chưa có lorebook.</div>');
@@ -983,7 +1000,7 @@ $('#c-more').onclick=e=>{const{char:c,chat:ch}=cur;menu(e.currentTarget,[['{i:ch
 function changeGreeting(){const{char:c,chat:ch}=cur;const gs=c.greetings;if(!gs.length)return toast('Nhân vật không có lời chào');
  const m=modal(`<h3>Đổi lời chào</h3>${gs.map((g,i)=>`<div class="gopt" data-i="${i}"><b>#${i+1}</b> ${esc(fill(g,c).slice(0,400))}</div>`).join('')}`);
  m.querySelectorAll('.gopt').forEach(e=>e.onclick=()=>{m.remove();const g=gs[+e.dataset.i];const f=ch.messages[0];if(f?.greeting){f.swipes=[g];f.sw=0}else ch.messages.unshift({id:uid(),role:'model',charId:c.id,swipes:[g],sw:0,greeting:true});saveChat(ch);drawMsgs(true)})}
-function showLore(){const{char:c,chat:ch}=cur;const r=activateLore(booksFor(members(ch)),ch.messages.slice(-S.scanDepth).map(msgText),S.loreBudget,()=>0,{chat:ch,dry:true,turn:ch.messages.length});
+function showLore(){const{char:c,chat:ch}=cur;const r=activateLore(booksFor(members(ch)),ch.messages.slice(-S.scanDepth).filter(m=>!isErrMsg(m)).map(msgText),S.loreBudget,()=>0,{chat:ch,dry:true,turn:ch.messages.length});
  const PN=['Trước nhân vật','Sau nhân vật','Đầu ghi chú TG','Cuối ghi chú TG','@Độ sâu','Trước ví dụ','Sau ví dụ'];
  modal(`<h3>World info đang kích hoạt</h3><p class="mut">${r.entries.length}/${r.total} mục khớp được chèn · ~${Math.round(r.chars/4)} / ${S.loreBudget} token · quét ${S.scanDepth} tin gần nhất${r.sticky?' · '+r.sticky+' mục đang dính (sticky)':''}</p>${r.entries.map(e=>`<div class="sec"><h4>${esc(e.comment||e.keys.join(', '))}${e.constant?' {i:pin}':''}</h4><small class="mut">${PN[+e.position||0]||''}${+e.position===4?' '+e.depth:''} · order ${e.order}</small>\n${esc(e.content.slice(0,300))}</div>`).join('')||'<div class="empty">Không có mục nào.</div>'}`)}
 function showAN(){const ch=cur.chat;const an=ch.authorNote||{};modal(`<h3>{i:note} Ghi chú tác giả (Author's Note)</h3><p class="mut">Chèn vào lịch sử ở độ sâu chọn sẵn để lái hướng câu chuyện. Hỗ trợ macro {{char}}, {{user}}, {{random::a::b}}…</p>
@@ -1039,10 +1056,9 @@ function drawMsgs(force,errText){const{char:c0,chat:ch}=cur;const B=$('#msgs');c
  const gg=gOf(ch);B.innerHTML=(from>0?`<button class="btn-g" id="c-older">{i:chevron-down} Xem ${from} tin cũ hơn</button>`:'')+ch.messages.slice(from).map((m,i0)=>{const i=i0+from;const u=m.role==='user';const c=u?c0:msgChar(m,ch,c0);const nar=!!m.narrator;
   const ck=m.ckpt?CT.find(x=>x.id===m.ckpt.id):null;
   return`<div class="m ${u?'u':''} ${i===n-1?'last':''}" data-i="${i}"><div class="av ${u&&per?.avatar?'pav':''}" style="${u?(per?.avatar?`--pav:url('${per.avatar}')`:''):`background-image:url('${nar?(gAv(gg)||c.avatar):c.avatar}')${nar?';border-radius:12px':''}`}"></div><div class="bub"><div class="who">${esc(u?per?.name||'User':nar?(gg?.name||'Mở đầu')+' · mở đầu':c.name)}</div>
-  ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${render(shown(m,c,ch))}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
-  ${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
-  <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button><button data-a="cont" title="Tiếp tục">{i:forward}</button>`:''}${!u?`<button data-a="tts" title="Đọc to">{i:volume}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(errText?`<div class="errbox">${esc(errText)}<div class="row" style="margin-top:8px"><button class="btn-g" id="c-retry" type="button">{i:refresh} Tạo lại</button></div></div>`:'')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
- const rb=B.querySelector('#c-retry');if(rb)rb.onclick=()=>{if(busy)return;rb.closest('.errbox')?.remove();const L=ch.messages[ch.messages.length-1];L&&L.role==='model'&&!L.narrator&&!L.greeting?generate('swipe'):generate('new')};
+  ${m.images?.length?`<div class="imgs">${m.images.map(s=>`<img src="${s}" loading="lazy" decoding="async">`).join('')}</div>`:''}<div class="tx ${m.streaming?'cursor':''} ${m.streaming&&!STREAM()?'nost':''}">${render(bubbleText(m,c,ch))}${m.streaming&&!STREAM()?`<span class="typing">${esc(c.name)} đang soạn tin<i></i><i></i><i></i></span>`:''}</div>
+  ${errView(m)?.detail?`<div class="mut errd">${esc(errView(m).detail)}</div>`:''}${m.note?`<div class="mut" style="margin-top:6px">${esc(m.note)}</div>`:''}${ck?`<div class="ckpt" data-ck="${ck.id}">{i:flag} ${esc(m.ckpt.name)}</div>`:''}
+  <div class="mt">${!u&&m.swipes.length>1?`<button data-a="prev">{i:chevron-left}</button><span>${m.sw+1}/${m.swipes.length}</span><button data-a="next">{i:chevron-right}</button>`:''}${!u&&!nar&&i===n-1&&!busy?`<button data-a="regen" title="Tạo lại">{i:refresh}</button>`+(isErrMsg(m)&&!msgText(m)?'':`<button data-a="cont" title="Tiếp tục">{i:forward}</button>`):''}${!u&&!(!isErrMsg(m)?0:!msgText(m))?`<button data-a="tts" title="Đọc to">{i:volume}</button>`:''}${!busy?`<button data-a="edit" title="Sửa">{i:edit}</button><button data-a="more" title="Thêm">{i:more}</button>`:''}</div></div></div>`}).join('')+(!n?'<div class="empty">Bắt đầu câu chuyện của bạn…</div>':'');
  const ob=B.querySelector('#c-older');if(ob)ob.onclick=()=>{const sc=$('#c-scroll'),f=B.querySelector('.m'),id=f?.dataset.i,y0=f?f.getBoundingClientRect().top:0;stick=false;cur.win=(cur.win||MSG_WIN)+MSG_WIN;drawMsgs(false);const fix=()=>{const e=id!=null&&B.querySelector(`.m[data-i="${id}"]`);if(e)sc.scrollTop+=e.getBoundingClientRect().top-y0};fix();requestAnimationFrame(()=>{fix();setTimeout(fix,250)})};
  B.querySelectorAll('.bub img').forEach(im=>im.onclick=()=>{const v=$('#imgview');v.querySelector('img').src=im.src;v.style.display='flex';const done=NAV.overlay(()=>{v.style.display='none'});v.onclick=()=>{v.style.display='none';done&&done()}});
  B.querySelectorAll('[data-a]').forEach(b=>b.onclick=ev=>msgAction(+b.closest('.m').dataset.i,b.dataset.a,ev.currentTarget));
@@ -1064,7 +1080,7 @@ async function msgAction(i,a,el){const{chat:ch}=cur;const m=ch.messages[i];if(a=
   ['{i:trash} Xóa từ đây trở xuống',()=>confirmDo(`Xóa ${ch.messages.length-i} tin từ đây trở xuống?`,async()=>{ch.messages.splice(i);await saveChat(ch);drawMsgs()})],['{i:trash} Xóa tin này',()=>msgAction(i,'del')]]);
  if(a==='del')return confirmDo('Xóa tin nhắn này?',async()=>{ch.messages.splice(i,1);await saveChat(ch);drawMsgs()});
  if(a==='edit'){const bub=document.querySelector(`.m[data-i="${i}"] .tx`);bub.innerHTML=`<textarea style="min-height:120px;width:100%">${esc(msgText(m))}</textarea><div class="row" style="margin-top:6px"><button class="btn-p">Lưu</button><button class="btn-g">Hủy</button></div>`;
-  const ta=bub.querySelector('textarea');ta.style.minWidth=Math.min(560,innerWidth*0.65)+'px';ta.focus();const[sv,cn]=bub.querySelectorAll('button');sv.onclick=async()=>{m.swipes[m.sw]=ta.value;await saveChat(ch);drawMsgs()};cn.onclick=()=>drawMsgs()}}
+  const ta=bub.querySelector('textarea');ta.style.minWidth=Math.min(560,innerWidth*0.65)+'px';ta.focus();const[sv,cn]=bub.querySelectorAll('button');sv.onclick=async()=>{m.swipes[m.sw]=ta.value;if(m.errOf)m.errOf[m.sw]=undefined;await saveChat(ch);drawMsgs()};cn.onclick=()=>drawMsgs()}}
 function pickReplacer(i){const ch=cur.chat;const m0=ch.messages[i];const ms=members(ch).filter(c=>c.id!==m0.charId);const m=modal(`<h3>{i:users} Ai nói thay?</h3><p class="mut">Tin này sẽ được thay bằng câu trả lời của người bạn chọn.</p>${ms.map(c=>`<div class="pitem" data-id="${c.id}"><div class="av" style="width:42px;height:42px;border-radius:12px;background-image:url('${c.avatar}')"></div><div class="t"><b>${esc(c.name)}</b></div>{i:play}</div>`).join('')}`);
  m.querySelectorAll('.pitem').forEach(e=>e.onclick=async()=>{m.remove();if(busy)return;if(ch.messages[i]===m0)ch.messages.splice(i,1);await saveChat(ch);generate('new',null,e.dataset.id)})}
 function cloneUpTo(ch,i,title){const n=structuredClone({...ch,messages:ch.messages.slice(0,i+1)});n.id=uid();n.title=title;n.parent=ch.id;n.created=n.updated=Date.now();n.messages.forEach(m=>{delete m.ckpt;delete m.streaming});CT.push(n);return n}
@@ -1087,17 +1103,17 @@ async function impersonate(){const{char:c0,chat:ch}=cur;if(busy)return;const c=n
  catch(e){if(e.name!=='AbortError'){ta.value=old;toast('{i:close} '+e.message,4000)}}finally{busy=impBusy=false;abortCtl=null;ta.placeholder='Nhập tin nhắn… (bắt đầu bằng OOC để nói ngoài vai)';updSend();drawBars();grow();ta.focus()}}
 async function generate(mode,errNote,speakerId){const{char:c0,chat:ch}=cur;if(busy)return;let target,history,extra,c;
  if(mode==='swipe'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return toast('Đây là lời mở đầu của nhóm – bấm Sửa để đổi');c=msgChar(target,ch,c0);history=ch.messages.slice(0,-1);target.swipes.push('');target.sw=target.swipes.length-1}
- else if(mode==='cont'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return;c=msgChar(target,ch,c0);history=ch.messages.slice();extra=S.contNudge||DEF_CONT}
+ else if(mode==='cont'){target=ch.messages[ch.messages.length-1];if(!target||target.role!=='model')return;if(target.narrator)return;c=msgChar(target,ch,c0);history=ch.messages.slice();if(isErrMsg(target))history=history.slice(0,-1).concat([{...target,errOf:null}]);extra=S.contNudge||DEF_CONT}
  else{c=speakerId?CH.find(x=>x.id===speakerId):(isGroup(ch)?pickSpeaker(ch,msgText(ch.messages[ch.messages.length-1]||{swipes:['']})):c0);c=c||c0;history=ch.messages.slice();target={id:uid(),role:'model',charId:c.id,swipes:[''],sw:0,t:Date.now()};ch.messages.push(target)}
- const base=mode==='cont'?msgText(target):'';busy=true;target.streaming=true;target.note='';drawMsgs(false);let err='',hit=false;VC.start(target,c,ch,mode);const RU=retryUI(target);
+ const base=mode==='cont'?msgText(target):'';busy=true;target.streaming=true;target.note='';if(target.errOf)target.errOf[target.sw]=undefined;drawMsgs(false);let err='',hit=false;VC.start(target,c,ch,mode);const RU=retryUI(target);
  try{const req=buildRequest(c,ch,history,extra);let lastDraw=0,raf=0;
   const put=t=>{if(isGroup(ch)&&mode!=='cont')t=t.replace(new RegExp('^\\s*'+reEsc(c.name)+'\\s*:\\s*'),'');target.swipes[target.sw]=base+(mode==='cont'&&base&&t&&!/^\s/.test(t)?' ':'')+t};
   const r=await aiStream(req,t=>{if(t)RU.clear();const k=cutStop(t,req.stops);if(k!=null){t=k;if(!hit){hit=true;abortCtl?.abort()}}put(t);VC.feed(target,c,ch);if(!raf&&performance.now()-lastDraw>100)raf=requestAnimationFrame(()=>{raf=0;lastDraw=performance.now();const el=document.querySelector('.m.last .tx');if(el){el.innerHTML=render(shown(target,c,ch));scrollDown()}})},{onRetry:i=>{if(i&&i.wait&&msgText(target)!==base){if(raf){cancelAnimationFrame(raf);raf=0}put('');VC.stop();VC.start(target,c,ch,'new');const el=document.querySelector('.m.last .tx');if(el)el.innerHTML=render(shown(target,c,ch))}RU.show(i)}});RU.clear();if(raf){cancelAnimationFrame(raf);raf=0}
-  target.note=finishNote(r);if(!(r.text||'').trim()&&mode!=='cont'){err=(r.raw&&r.raw.trim())||!target.note?'{i:close} Model trả về trống (chỉ có thẻ, không có lời thoại), bấm Tạo lại.':target.note;target.note=''}}
+  target.note=finishNote(r);if(r.block||HARD_FIN.includes(r.finish)){err=target.note||('{i:ban} '+(r.block||r.finish));target.note=''}else if(!(r.text||'').trim()&&mode!=='cont'){err=(r.raw&&r.raw.trim())||!target.note?'{i:close} Model trả về trống (chỉ có thẻ, không có lời thoại), bấm Tạo lại.':target.note;target.note=''}}
  catch(e){if(e.name==='AbortError'){if(e.last&&!(msgText(target)||'').replace(base,'').trim())err='{i:close} '+e.last+'\n(Đã hủy tự thử lại – bấm Tạo lại để thử tiếp.)';else target.note=hit?'':'{i:stop} Đã dừng.'}else err='{i:close} '+e.message}
  RU.clear();busy=false;target.streaming=false;abortCtl=null;target.swipes[target.sw]=applyRegex(msgText(target).replace(/\s+$/,''),'ai','edit');
- if(err&&!msgText(target)){if(mode==='swipe'){target.swipes.pop();target.sw=Math.max(0,target.swipes.length-1)}else if(mode==='new')ch.messages.pop()}
- VC.end(target,c,ch,!err);await saveChat(ch);drawMsgs(false,err);
+ if(err){(target.errOf||(target.errOf=[]) )[target.sw]=err}else if(target.errOf)target.errOf[target.sw]=undefined;
+ VC.end(target,c,ch,!err);await saveChat(ch);drawMsgs(false);
  return!err}
 let stopQ=false;
 async function runQueue(ch,list){stopQ=false;let n=0;for(const c of list){if(stopQ||cur.chat!==ch)break;const ok=await generate('new',null,c.id);n++;if(!ok)break}stopQ=false;return n}
